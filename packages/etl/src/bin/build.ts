@@ -23,7 +23,7 @@ import { conflatePoints } from '../conflate'
 import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
 import { extractLocks } from '../locks'
 import { extractDerelictCanals, extractMoorings } from '../moorings'
-import { corridorCells, extractPois } from '../pois'
+import { buildNetworkIndex, extractPois } from '../pois'
 import { buildOverlayTiles, corridorFromGraph, writeCorridor } from '../tiles'
 
 interface Args {
@@ -153,11 +153,8 @@ async function main(): Promise<void> {
   )
   manifest['osmMoorings'] = moorings.length
 
-  const cells = corridorCells(
-    graph.edges.map((e) => e.geometry),
-    0.05,
-  )
-  const pois = extractPois(data, { corridorCells: cells })
+  const network = buildNetworkIndex(graph.edges.map((e) => e.geometry))
+  const pois = extractPois(data, { network, maxWalkM: 2000 })
   await writeFile(
     join(args.out, 'osm-pois.geojson'),
     JSON.stringify({
@@ -166,7 +163,12 @@ async function main(): Promise<void> {
         type: 'Feature',
         id: poi.id,
         geometry: { type: 'Point', coordinates: poi.point },
-        properties: { category: poi.category, name: poi.name, source: poi.source },
+        properties: {
+          category: poi.category,
+          name: poi.name,
+          walkM: poi.walkM,
+          source: poi.source,
+        },
       })),
     }),
   )

@@ -20,12 +20,15 @@ export type PoiCategory =
   | 'fuel'
   | 'chandlery'
   | 'drinking-water'
+  | 'station'
 
 export interface Poi {
   id: number
   category: PoiCategory
   name: string | null
   point: [number, number]
+  /** Crow-flies metres to the nearest waterway — the "how far a walk" signal. */
+  walkM: number
   source: 'osm'
 }
 
@@ -40,6 +43,7 @@ const SHOP_TYPES = new Set([
 ])
 
 function categorize(tags: Record<string, string>): PoiCategory | null {
+  if (tags['railway'] === 'station' || tags['railway'] === 'halt') return 'station'
   switch (tags['waterway']) {
     case 'lock_gate':
       return 'lock-gate'
@@ -85,13 +89,58 @@ function wayCentroid(way: OplWay, nodes: ReadonlyMap<number, OplNode>): [number,
 }
 
 export interface ExtractPoisOptions {
-  /**
-   * Keep only POIs within these grid cells (keys "cx,cy" at cellDeg) — the
-   * same cells as the map corridor. Without it, shop/pub filters would pull
-   * in every establishment in Britain, canal-adjacent or not.
-   */
-  corridorCells?: ReadonlySet<string>
-  cellDeg?: number
+  /** Nearest-waterway index; POIs further than maxWalkM are dropped. */
+  network?: NetworkIndex
+  /** Default 2000 m (~25 min walk) — the app filters tighter (~20 min). */
+  maxWalkM?: number
+}
+
+/**
+ * Spatial hash of waterway geometry vertices (vertex spacing on UK canals is
+ * ~20–50 m, so nearest-vertex ≈ nearest-line well within walking tolerances).
+ */
+export interface NetworkIndex {
+  cells: Map<string, LonLat[]>
+  cellDeg: number
+}
+
+export function buildNetworkIndex(
+  geometries: Iterable<readonly LonLat[]>,
+  cellDeg = 0.03,
+): NetworkIndex {
+  const cells = new Map<string, LonLat[]>()
+  for (const line of geometries) {
+    for (const point of line) {
+      const key = cellKey(point, cellDeg)
+      const bucket = cells.get(key)
+      if (bucket) bucket.push(point)
+      else cells.set(key, [point])
+    }
+  }
+  return { cells, cellDeg }
+}
+
+const EARTH_M_PER_DEG_LAT = 111_320
+
+export function distanceToNetworkM(index: NetworkIndex, point: readonly [number, number]): number {
+  const cx = Math.floor(point[0] / index.cellDeg)
+  const cy = Math.floor(point[1] / index.cellDeg)
+  let best = Infinity
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const bucket = index.cells.get(`${cx + dx},${cy + dy}`)
+      if (!bucket) continue
+      for (const vertex of bucket) {
+        // equirectangular — ample at walking scales
+        const dLat = (vertex[1] - point[1]) * EARTH_M_PER_DEG_LAT
+        const dLon =
+          (vertex[0] - point[0]) * EARTH_M_PER_DEG_LAT * Math.cos((point[1] * Math.PI) / 180)
+        const d = Math.hypot(dLat, dLon)
+        if (d < best) best = d
+      }
+    }
+  }
+  return best
 }
 
 export function cellKey(point: readonly [number, number], cellDeg: number): string {
@@ -119,24 +168,44 @@ export function corridorCells(
 }
 
 export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Poi[] {
-  const cellDeg = options.cellDeg ?? 0.05
-  const inCorridor = (point: [number, number]) =>
-    !options.corridorCells || options.corridorCells.has(cellKey(point, cellDeg))
+  const maxWalkM = options.maxWalkM ?? 2000
+  const walkOf = (point: [number, number]): number | null => {
+    if (!options.network) return 0
+    const d = distanceToNetworkM(options.network, point)
+    return d <= maxWalkM ? Math.round(d) : null
+  }
 
   const pois: Poi[] = []
   for (const node of data.nodes.values()) {
     const category = categorize(node.tags)
     if (!category) continue
     const point: [number, number] = [node.lon, node.lat]
-    if (!inCorridor(point)) continue
-    pois.push({ id: node.id, category, name: node.tags['name'] ?? null, point, source: 'osm' })
+    const walkM = walkOf(point)
+    if (walkM === null) continue
+    pois.push({
+      id: node.id,
+      category,
+      name: node.tags['name'] ?? null,
+      point,
+      walkM,
+      source: 'osm',
+    })
   }
   for (const way of data.ways) {
     const category = categorize(way.tags)
     if (!category) continue
     const point = wayCentroid(way, data.nodes)
-    if (!point || !inCorridor(point)) continue
-    pois.push({ id: way.id, category, name: way.tags['name'] ?? null, point, source: 'osm' })
+    if (!point) continue
+    const walkM = walkOf(point)
+    if (walkM === null) continue
+    pois.push({
+      id: way.id,
+      category,
+      name: way.tags['name'] ?? null,
+      point,
+      walkM,
+      source: 'osm',
+    })
   }
   return pois
 }

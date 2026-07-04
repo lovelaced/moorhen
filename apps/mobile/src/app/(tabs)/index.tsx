@@ -1,14 +1,17 @@
 import Feather from '@expo/vector-icons/Feather'
+import type { FilterSpecification } from '@maplibre/maplibre-gl-style-spec'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
-import { useCallback, useState } from 'react'
+import * as Location from 'expo-location'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   DetailSheet,
   selectFacility,
   selectLock,
   selectMooring,
+  selectNotice,
   selectPoi,
   type SelectedFeature,
 } from '../../components/detail-sheet'
@@ -32,23 +35,150 @@ function loadMapLibre(): MapLibreModule | null {
 
 const MapLibre = loadMapLibre()
 
-const LAYER_CHIPS = [
-  { key: 'moorings', label: 'Moorings', icon: 'anchor', active: true },
-  { key: 'water', label: 'Water', icon: 'droplet', active: false },
-  { key: 'elsan', label: 'Elsan', icon: 'rotate-ccw', active: false },
-  { key: 'pumpout', label: 'Pump-out', icon: 'arrow-up-circle', active: false },
-  { key: 'diesel', label: 'Diesel', icon: 'zap', active: false },
-  { key: 'pubs', label: 'Pubs', icon: 'coffee', active: false },
-  { key: 'shops', label: 'Shops', icon: 'shopping-bag', active: false },
-  { key: 'laundry', label: 'Laundry', icon: 'refresh-cw', active: false },
-  { key: 'bins', label: 'Bins', icon: 'trash-2', active: false },
-  { key: 'stoppages', label: 'Stoppages', icon: 'alert-triangle', active: false },
-] as const
+/** Marker badges rendered from the icon font at build time (src/assets/markers). */
+/* eslint-disable @typescript-eslint/no-require-imports -- RN static assets */
+const MARKER_IMAGES = {
+  pub: require('../../assets/markers/pub.png'),
+  shop: require('../../assets/markers/shop.png'),
+  laundry: require('../../assets/markers/laundry.png'),
+  fuel: require('../../assets/markers/fuel.png'),
+  chandlery: require('../../assets/markers/chandlery.png'),
+  water: require('../../assets/markers/water.png'),
+  elsan: require('../../assets/markers/elsan.png'),
+  station: require('../../assets/markers/station.png'),
+  bins: require('../../assets/markers/bins.png'),
+  stoppage: require('../../assets/markers/stoppage.png'),
+  facility: require('../../assets/markers/facility.png'),
+}
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+type ChipKey =
+  | 'moorings'
+  | 'water'
+  | 'elsan'
+  | 'pumpout'
+  | 'diesel'
+  | 'pubs'
+  | 'shops'
+  | 'laundry'
+  | 'bins'
+  | 'trains'
+  | 'stoppages'
+
+const LAYER_CHIPS: Array<{ key: ChipKey; label: string; icon: keyof typeof Feather.glyphMap }> = [
+  { key: 'moorings', label: 'Moorings', icon: 'anchor' },
+  { key: 'water', label: 'Water', icon: 'droplet' },
+  { key: 'elsan', label: 'Elsan', icon: 'rotate-ccw' },
+  { key: 'pumpout', label: 'Pump-out', icon: 'arrow-up-circle' },
+  { key: 'diesel', label: 'Diesel', icon: 'zap' },
+  { key: 'pubs', label: 'Pubs', icon: 'coffee' },
+  { key: 'shops', label: 'Shops', icon: 'shopping-bag' },
+  { key: 'laundry', label: 'Laundry', icon: 'refresh-cw' },
+  { key: 'bins', label: 'Bins', icon: 'trash-2' },
+  { key: 'trains', label: 'Trains', icon: 'chevrons-right' },
+  { key: 'stoppages', label: 'Stoppages', icon: 'alert-triangle' },
+]
+
+/** Which OSM POI categories each chip switches on. */
+const CHIP_POI_CATEGORIES: Partial<Record<ChipKey, string[]>> = {
+  water: ['water-point', 'drinking-water'],
+  elsan: ['elsan'],
+  diesel: ['fuel', 'chandlery'],
+  pubs: ['pub'],
+  shops: ['shop'],
+  laundry: ['laundry'],
+}
+
+/** Which CRT facility service flags each chip switches on. */
+const CHIP_FACILITY_SERVICES: Partial<Record<ChipKey, string[]>> = {
+  water: ['water'],
+  elsan: ['elsan'],
+  pumpout: ['pumpOutUserOperated', 'pumpOutStaffOperated'],
+  laundry: ['washingMachine', 'tumbleDryer'],
+  bins: ['refuse', 'recycling'],
+}
+
+/** ~20 minutes at towpath pace. */
+const MAX_WALK_M = 1600
+
+const POI_ICON: unknown = [
+  'match',
+  ['get', 'category'],
+  'pub',
+  'pub',
+  'shop',
+  'shop',
+  'laundry',
+  'laundry',
+  'fuel',
+  'fuel',
+  'chandlery',
+  'chandlery',
+  'water-point',
+  'water',
+  'drinking-water',
+  'water',
+  'elsan',
+  'elsan',
+  'facility',
+]
 
 type FeaturePress = NativeSyntheticEvent<{ features: GeoJSON.Feature[] }>
 
+interface NoticesFile {
+  notices: Array<{
+    id: string
+    title: string
+    type: string
+    reason: string | null
+    start: string | null
+    end: string | null
+    url: string | null
+    isNavigationBlocking: boolean
+    points: [number, number][]
+  }>
+}
+
 export default function MapScreen() {
   const [selected, setSelected] = useState<SelectedFeature | null>(null)
+  const [active, setActive] = useState<Set<ChipKey>>(new Set(['moorings', 'water']))
+  const [stoppages, setStoppages] = useState<GeoJSON.FeatureCollection | null>(null)
+  const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
+
+  useEffect(() => {
+    fetch(urls.notices)
+      .then((response) => response.json())
+      .then((file: NoticesFile) => {
+        const features: GeoJSON.Feature[] = file.notices
+          .filter((notice) => notice.isNavigationBlocking)
+          .flatMap((notice) =>
+            notice.points.map((point, index) => ({
+              type: 'Feature' as const,
+              id: `${notice.id}-${index}`,
+              geometry: { type: 'Point' as const, coordinates: point },
+              properties: {
+                title: notice.title,
+                type: notice.type,
+                reason: notice.reason,
+                start: notice.start,
+                end: notice.end,
+                url: notice.url,
+              },
+            })),
+          )
+        setStoppages({ type: 'FeatureCollection', features })
+      })
+      .catch(() => setStoppages(null))
+  }, [])
+
+  const toggleChip = useCallback((key: ChipKey) => {
+    setActive((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const onFeaturePress = useCallback(
     (select: (feature: GeoJSON.Feature) => SelectedFeature) => (event: FeaturePress) => {
@@ -58,6 +188,26 @@ export default function MapScreen() {
     [],
   )
 
+  const locateMe = useCallback(async () => {
+    const permission = await Location.requestForegroundPermissionsAsync()
+    if (!permission.granted) return
+    const position = await Location.getCurrentPositionAsync({})
+    cameraRef.current?.easeTo({
+      center: [position.coords.longitude, position.coords.latitude],
+      zoom: 13,
+      duration: 800,
+    })
+  }, [])
+
+  const activePoiCategories = useMemo(
+    () => [...active].flatMap((key) => CHIP_POI_CATEGORIES[key] ?? []),
+    [active],
+  )
+  const activeFacilityServices = useMemo(
+    () => [...active].flatMap((key) => CHIP_FACILITY_SERVICES[key] ?? []),
+    [active],
+  )
+
   return (
     <View style={styles.root}>
       {MapLibre ? (
@@ -65,9 +215,16 @@ export default function MapScreen() {
           style={StyleSheet.absoluteFill}
           mapStyle="https://tiles.openfreemap.org/styles/liberty"
           onPress={() => setSelected(null)}
+          compass={true}
+          compassPosition={{ top: 118, right: 10 }}
         >
           {/* Braunston — the crossroads of the network — until location wiring lands */}
-          <MapLibre.Camera initialViewState={{ center: [-1.21, 52.29], zoom: 11 }} />
+          <MapLibre.Camera
+            ref={cameraRef}
+            initialViewState={{ center: [-1.21, 52.29], zoom: 11 }}
+          />
+          <MapLibre.UserLocation />
+          <MapLibre.Images images={MARKER_IMAGES} />
 
           <MapLibre.GeoJSONSource id="waterways" data={urls.waterways}>
             {/* derelict/unrestored: pale, dashed, clearly not navigable */}
@@ -130,6 +287,7 @@ export default function MapScreen() {
               id="mooring-lines"
               minzoom={11}
               filter={['==', ['get', 'access'], 'public']}
+              layout={{ visibility: active.has('moorings') ? 'visible' : 'none' }}
               paint={{
                 'line-color': day.green,
                 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 8],
@@ -144,50 +302,71 @@ export default function MapScreen() {
             onPress={onFeaturePress(selectFacility)}
           >
             <MapLibre.Layer
-              type="circle"
-              id="facility-dots"
+              type="symbol"
+              id="facility-badges"
               minzoom={9}
-              paint={{
-                'circle-color': day.green,
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 14, 7],
-                'circle-stroke-color': '#FFFFFF',
-                'circle-stroke-width': 1.5,
+              filter={
+                activeFacilityServices.length > 0
+                  ? ([
+                      'any',
+                      ...activeFacilityServices.map((service) => ['==', ['get', service], true]),
+                    ] as unknown as FilterSpecification)
+                  : ['==', ['get', 'name'], '__none__']
+              }
+              layout={{
+                'icon-image': 'facility',
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.55],
+                'icon-allow-overlap': true,
               }}
             />
           </MapLibre.GeoJSONSource>
 
           <MapLibre.GeoJSONSource id="pois" data={urls.pois} onPress={onFeaturePress(selectPoi)}>
             <MapLibre.Layer
-              type="circle"
-              id="poi-dots"
+              type="symbol"
+              id="poi-badges"
               minzoom={11}
-              filter={[
-                '!',
-                ['in', ['get', 'category'], ['literal', ['winding-hole', 'lock-gate']]],
-              ]}
+              filter={
+                [
+                  'all',
+                  ['<=', ['get', 'walkM'], MAX_WALK_M],
+                  ['in', ['get', 'category'], ['literal', activePoiCategories]],
+                ] as unknown as FilterSpecification
+              }
+              layout={{
+                'icon-image': POI_ICON as string,
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.35, 14, 0.58],
+                'icon-allow-overlap': false,
+              }}
+            />
+            {/* stations get their own layer: visible further out, labelled */}
+            <MapLibre.Layer
+              type="symbol"
+              id="station-badges"
+              minzoom={8}
+              filter={
+                [
+                  'all',
+                  ['==', ['get', 'category'], 'station'],
+                  ['<=', ['get', 'walkM'], MAX_WALK_M],
+                ] as unknown as FilterSpecification
+              }
+              layout={{
+                visibility: active.has('trains') ? 'visible' : 'none',
+                'icon-image': 'station',
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.32, 13, 0.55],
+                'icon-allow-overlap': true,
+                'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
+                'text-font': ['Noto Sans Regular'],
+                'text-size': 11,
+                'text-offset': [0, 1.4],
+                'text-anchor': 'top',
+                'text-optional': true,
+              }}
               paint={{
-                'circle-color': [
-                  'match',
-                  ['get', 'category'],
-                  'water-point',
-                  day.green,
-                  'elsan',
-                  day.waterDeep,
-                  'pub',
-                  '#C98B3D',
-                  'shop',
-                  '#6D6C6A',
-                  'laundry',
-                  '#8E6FB8',
-                  'fuel',
-                  day.billYellow,
-                  'chandlery',
-                  day.waterDeep,
-                  day.ink3,
-                ],
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 6],
-                'circle-stroke-color': '#FFFFFF',
-                'circle-stroke-width': 1,
+                'text-color': day.ink,
+                'text-halo-color': '#FFFFFF',
+                'text-halo-width': 1.4,
               }}
             />
             {/* winding holes: where you can actually turn — bigger, ringed */}
@@ -227,6 +406,27 @@ export default function MapScreen() {
               }}
             />
           </MapLibre.GeoJSONSource>
+
+          {stoppages && (
+            <MapLibre.GeoJSONSource
+              id="stoppages"
+              data={stoppages}
+              onPress={onFeaturePress(selectNotice)}
+            >
+              {/* rare but important: visible from system-map zooms */}
+              <MapLibre.Layer
+                type="symbol"
+                id="stoppage-badges"
+                minzoom={5}
+                layout={{
+                  visibility: active.has('stoppages') ? 'visible' : 'none',
+                  'icon-image': 'stoppage',
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 12, 0.6],
+                  'icon-allow-overlap': true,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
         </MapLibre.Map>
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.mapPlaceholder]}>
@@ -254,19 +454,27 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
         >
-          {LAYER_CHIPS.map((chip) => (
-            <View
-              key={chip.key}
-              style={[styles.chip, shadow.pill, chip.active && styles.chipActive]}
-            >
-              <Feather name={chip.icon} size={14} color={chip.active ? day.surface : day.ink2} />
-              <Text style={[styles.chipLabel, chip.active && styles.chipLabelActive]}>
-                {chip.label}
-              </Text>
-            </View>
-          ))}
+          {LAYER_CHIPS.map((chip) => {
+            const isActive = active.has(chip.key)
+            return (
+              <Pressable
+                key={chip.key}
+                onPress={() => toggleChip(chip.key)}
+                style={[styles.chip, shadow.pill, isActive && styles.chipActive]}
+              >
+                <Feather name={chip.icon} size={14} color={isActive ? day.surface : day.ink2} />
+                <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
+                  {chip.label}
+                </Text>
+              </Pressable>
+            )
+          })}
         </ScrollView>
       </SafeAreaView>
+
+      <Pressable style={[styles.locateButton, shadow.pill]} onPress={locateMe}>
+        <Feather name="crosshair" size={20} color={day.ink} />
+      </Pressable>
 
       {selected && <DetailSheet selected={selected} onClose={() => setSelected(null)} />}
     </View>
@@ -303,6 +511,17 @@ const styles = StyleSheet.create({
   },
   searchText: { fontFamily: font.regular, fontSize: 15, color: day.ink3 },
   roundButton: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: day.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locateButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 24,
     width: 48,
     height: 48,
     borderRadius: radius.pill,

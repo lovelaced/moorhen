@@ -14,6 +14,8 @@ export interface SelectedFeature {
   subtitle: string
   details: string[]
   coords: [number, number]
+  /** Optional primary link (e.g. the CRT notice page) shown beside Street View. */
+  link?: { label: string; url: string }
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -27,6 +29,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   chandlery: 'Chandlery',
   'drinking-water': 'Drinking water',
   'lock-gate': 'Lock gate',
+  station: 'Railway station',
 }
 
 const FACILITY_SERVICES: Array<[string, string]> = [
@@ -54,13 +57,21 @@ function pointOf(feature: GeoJSON.Feature): [number, number] {
   return [0, 0]
 }
 
+function walkNote(props: Props): string | null {
+  const walkM = Number(props['walkM'])
+  if (!Number.isFinite(walkM)) return null
+  const minutes = Math.max(1, Math.round(walkM / 80)) // ~4.8 km/h
+  return `~${minutes} min walk from the cut`
+}
+
 export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const category = CATEGORY_LABELS[String(props['category'])] ?? 'Place'
+  const walk = walkNote(props)
   return {
     title: (props['name'] as string) || category,
     subtitle: `${category} · OpenStreetMap`,
-    details: [],
+    details: walk ? [walk] : [],
     coords: pointOf(feature),
   }
 }
@@ -107,6 +118,21 @@ export function selectMooring(feature: GeoJSON.Feature): SelectedFeature {
   }
 }
 
+export function selectNotice(feature: GeoJSON.Feature): SelectedFeature {
+  const props = (feature.properties ?? {}) as Props
+  const dates =
+    props['start'] && props['end']
+      ? `${String(props['start']).slice(0, 10)} → ${String(props['end']).slice(0, 10)}`
+      : null
+  return {
+    title: (props['title'] as string) || 'Stoppage',
+    subtitle: `${String(props['type'] ?? 'Notice')}${props['reason'] ? ` · ${String(props['reason'])}` : ''}`,
+    details: dates ? [dates] : [],
+    coords: pointOf(feature),
+    link: props['url'] ? { label: 'Full notice', url: String(props['url']) } : undefined,
+  }
+}
+
 export function DetailSheet({
   selected,
   onClose,
@@ -132,17 +158,27 @@ export function DetailSheet({
         </Text>
       ))}
       <View style={styles.buttons}>
-        <Pressable
-          style={styles.buttonPrimary}
-          onPress={() =>
-            Linking.openURL(
-              `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`,
-            )
-          }
-        >
-          <Feather name="external-link" size={15} color="#FFFFFF" />
-          <Text style={styles.buttonPrimaryText}>Street View</Text>
-        </Pressable>
+        {selected.link ? (
+          <Pressable
+            style={styles.buttonPrimary}
+            onPress={() => Linking.openURL(selected.link!.url)}
+          >
+            <Feather name="file-text" size={15} color="#FFFFFF" />
+            <Text style={styles.buttonPrimaryText}>{selected.link.label}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={styles.buttonPrimary}
+            onPress={() =>
+              Linking.openURL(
+                `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`,
+              )
+            }
+          >
+            <Feather name="external-link" size={15} color="#FFFFFF" />
+            <Text style={styles.buttonPrimaryText}>Street View</Text>
+          </Pressable>
+        )}
         <Pressable style={styles.buttonSecondary} onPress={onClose}>
           <Text style={styles.buttonSecondaryText}>Close</Text>
         </Pressable>
