@@ -188,3 +188,16 @@ export function formatJourneyDuration(
     ? `${days} day${days > 1 ? 's' : ''}`
     : `${days} day${days > 1 ? 's' : ''} ${remainderH} h`
 }
+
+import type { WaterwayEdge } from './builder.js'
+
+/** Adapts a graph edge to the timing model's shape. */
+export function edgeToTimingEdge(edge: WaterwayEdge): TimingEdge {
+  return {
+    lengthM: edge.lengthM,
+    waterwayClass: edge.navigableClass,
+    narrowLocks: edge.narrowLocks,
+    broadLocks: edge.broadLocks,
+    tunnelM: edge.tunnelM,
+  }
+}

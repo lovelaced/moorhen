@@ -1,3 +1,6 @@
 export * from './chainage.js'
 export * from './direction.js'
 export * from './timing.js'
+export * from './classification.js'
+export * from './builder.js'
+export * from './route.js'

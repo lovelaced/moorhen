@@ -35,6 +35,9 @@ importers:
 
   packages/etl:
     dependencies:
+      '@moorhen/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@moorhen/schema':
         specifier: workspace:*
         version: link:../schema
