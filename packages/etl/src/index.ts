@@ -3,3 +3,4 @@
 export * as crtNotices from './crt/notices.js'
 export * as osm from './osm/pipeline.js'
 export * from './osm/opl.js'
+export * as crtFacilities from './crt/facilities.js'
