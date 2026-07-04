@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { urls } from '../../data'
 import { day, font, radius, shadow } from '../../theme'
 
 /**
@@ -36,7 +37,85 @@ export default function MapScreen() {
         <MapLibre.Map
           style={StyleSheet.absoluteFill}
           mapStyle="https://tiles.openfreemap.org/styles/liberty"
-        />
+        >
+          {/* Braunston — the crossroads of the network — until location wiring lands */}
+          <MapLibre.Camera initialViewState={{ center: [-1.21, 52.29], zoom: 11 }} />
+          <MapLibre.GeoJSONSource id="waterways" data={urls.waterways}>
+            <MapLibre.Layer
+              type="line"
+              id="waterway-casing"
+              paint={{
+                'line-color': '#CFE0E6',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 14, 12],
+              }}
+              layout={{ 'line-cap': 'round' }}
+            />
+            <MapLibre.Layer
+              type="line"
+              id="waterway-line"
+              paint={{
+                // wide vs narrow is first-class: broad canals draw heavier & deeper
+                'line-color': [
+                  'match',
+                  ['get', 'class'],
+                  'broad-canal',
+                  day.waterDeep,
+                  'narrow-canal',
+                  day.water,
+                  '#7FA8B8', // rivers
+                ],
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  8,
+                  ['match', ['get', 'class'], 'broad-canal', 2.2, 1.6],
+                  14,
+                  ['match', ['get', 'class'], 'broad-canal', 9, 6],
+                ],
+              }}
+              layout={{ 'line-cap': 'round' }}
+            />
+          </MapLibre.GeoJSONSource>
+          <MapLibre.GeoJSONSource id="facilities" data={urls.facilities}>
+            <MapLibre.Layer
+              type="circle"
+              id="facility-dots"
+              minzoom={9}
+              paint={{
+                'circle-color': day.green,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 14, 7],
+                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-width': 1.5,
+              }}
+            />
+          </MapLibre.GeoJSONSource>
+          <MapLibre.GeoJSONSource id="pois" data={urls.pois}>
+            <MapLibre.Layer
+              type="circle"
+              id="poi-dots"
+              minzoom={11}
+              paint={{
+                'circle-color': [
+                  'match',
+                  ['get', 'category'],
+                  'water-point',
+                  day.green,
+                  'elsan',
+                  day.waterDeep,
+                  'pub',
+                  '#C98B3D',
+                  'lock-gate',
+                  '#8FA3AC',
+                  day.ink3,
+                ],
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 6],
+                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-width': 1,
+              }}
+            />
+          </MapLibre.GeoJSONSource>
+        </MapLibre.Map>
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.mapPlaceholder]}>
           <Feather name="map" size={40} color={day.water} />
