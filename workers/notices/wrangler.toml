@@ -1,0 +1,23 @@
+# Deploy-later config: fill in the ids/secrets during the credentials phase.
+#   wrangler kv namespace create SEEN_KV        → paste id below
+#   wrangler r2 bucket create moorhen-data      → uncomment binding
+#   wrangler secret put FCM_SERVICE_ACCOUNT     → service-account JSON
+#   wrangler secret put HEALTHCHECK_URL         → healthchecks.io ping URL
+name = "moorhen-notices"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+FCM_PROJECT_ID = ""
+NOTICES_WINDOW_DAYS = "56"
+
+# [[kv_namespaces]]
+# binding = "SEEN_KV"
+# id = "<create with: wrangler kv namespace create SEEN_KV>"
+
+# [[r2_buckets]]
+# binding = "DATA_BUCKET"
+# bucket_name = "moorhen-data"

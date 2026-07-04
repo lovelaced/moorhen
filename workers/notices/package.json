@@ -1,0 +1,13 @@
+{
+  "name": "@moorhen/worker-notices",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Cloudflare Worker: poll CRT notices, diff, publish, FCM topic fan-out",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@moorhen/etl": "workspace:*",
+    "@moorhen/schema": "workspace:*"
+  }
+}
