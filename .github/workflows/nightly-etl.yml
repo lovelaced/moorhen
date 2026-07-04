@@ -1,0 +1,71 @@
+# Nightly data build: Geofabrik GB → artifacts → R2 (when configured).
+#
+# - Odd minute on purpose (GH cron at :00 is heavily delayed/dropped).
+# - Publishing to Cloudflare R2 only happens when the R2 secrets exist, so
+#   forks and the pre-infrastructure phase still get a green build with the
+#   artifacts attached to the workflow run.
+# - The committed manifest doubles as a drift log and keeps the repo active
+#   (GH auto-disables cron on 60 days of repo inactivity).
+name: Nightly ETL
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - run: pnpm registry:check
+
+      - name: Download Geofabrik GB extract
+        run: curl -sSL --retry 3 -o gb.osm.pbf https://download.geofabrik.de/europe/great-britain-latest.osm.pbf
+
+      - name: Build artifacts
+        run: pnpm etl:build --pbf gb.osm.pbf --out artifacts
+
+      - name: Drift check vs last manifest
+        run: |
+          if [ -f data/manifest-latest.json ]; then
+            node scripts/check-drift.mjs data/manifest-latest.json artifacts/manifest.json
+          else
+            echo "no previous manifest — first run"
+          fi
+
+      - name: Commit manifest (drift log + repo keepalive)
+        run: |
+          mkdir -p data
+          cp artifacts/manifest.json data/manifest-latest.json
+          git config user.name "moorhen-etl"
+          git config user.email "etl@users.noreply.github.com"
+          git add data/manifest-latest.json
+          git diff --cached --quiet || git commit -m "chore(data): nightly manifest $(date -u +%F)"
+          git push
+
+      - name: Publish to R2
+        if: ${{ vars.R2_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          aws s3 sync artifacts "s3://${{ vars.R2_BUCKET }}/data/latest" --checksum-algorithm CRC32
+
+      - name: Attach artifacts to run (always)
+        uses: actions/upload-artifact@v4
+        with:
+          name: moorhen-data
+          path: artifacts/
+          retention-days: 14

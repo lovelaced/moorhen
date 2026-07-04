@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "registry:check": "node scripts/check-registry.mjs"
+    "registry:check": "node scripts/check-registry.mjs",
+    "etl:build": "tsx packages/etl/src/bin/build.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -22,6 +23,7 @@
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
     "prettier": "^3.9.4",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.1",
     "vitest": "^4.1.9"
