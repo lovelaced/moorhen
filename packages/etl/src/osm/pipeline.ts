@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
-import { parseOpl, type OplData } from './opl.js'
+import { parseOpl, type OplData } from './opl'
 
 /** Licence-registry id — checked by scripts/check-registry.mjs. */
 export const SOURCE_ID = 'osm-geofabrik-gb'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDirectionTracker } from './direction.js'
+import { createDirectionTracker } from './direction'
 
 /** Simulated cruise: emit fixes every `intervalMs`, moving `speedMps` along the chainage. */
 function cruise(

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LonLat } from './notices.js'
+import type { LonLat } from './notices'
 
 /**
  * FSA Food Hygiene Rating Scheme establishments (England/Wales/NI numeric

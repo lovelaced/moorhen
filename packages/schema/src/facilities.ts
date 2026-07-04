@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LonLat } from './notices.js'
+import type { LonLat } from './notices'
 
 /**
  * CRT legacy boater-facility layers (ArcGIS FeatureServer, last refreshed

@@ -6,7 +6,7 @@ import {
   estimateJourney,
   formatJourneyDuration,
   type TimingEdge,
-} from './timing.js'
+} from './timing'
 
 const MILE = 1609.344
 

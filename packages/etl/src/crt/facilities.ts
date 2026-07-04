@@ -1,5 +1,5 @@
 import { parseFacilitiesPage, type Facility } from '@moorhen/schema'
-import { ETL_USER_AGENT } from './notices.js'
+import { ETL_USER_AGENT } from './notices'
 
 /** Licence-registry id — checked by scripts/check-registry.mjs. */
 export const SOURCE_ID = 'crt-legacy-facilities'

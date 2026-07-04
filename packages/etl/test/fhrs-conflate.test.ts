@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseEstablishmentsResponse } from '@moorhen/schema'
-import { conflatePoints } from '../src/conflate.js'
-import { buildEstablishmentsUrl, fetchEstablishmentsNear } from '../src/fsa/fhrs.js'
+import { conflatePoints } from '../src/conflate'
+import { buildEstablishmentsUrl, fetchEstablishmentsNear } from '../src/fsa/fhrs'
 
 const fixtureRaw = readFileSync(new URL('./fixtures/fhrs-braunston.json', import.meta.url), 'utf8')
 const fixture = JSON.parse(fixtureRaw) as unknown

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseFacilitiesPage } from '@moorhen/schema'
-import { buildFacilityPageUrl, fetchAllFacilities } from '../src/crt/facilities.js'
+import { buildFacilityPageUrl, fetchAllFacilities } from '../src/crt/facilities'
 
 const fixtureRaw = readFileSync(
   new URL('./fixtures/crt-facilities-page.json', import.meta.url),

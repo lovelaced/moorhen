@@ -1,4 +1,4 @@
-import type { OplNode } from './osm/opl.js'
+import type { OplNode } from './osm/opl'
 
 /**
  * OSM point-of-interest extraction for the corridor layers. Categories map to

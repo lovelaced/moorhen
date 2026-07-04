@@ -17,11 +17,11 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildWaterwayGraph } from '@moorhen/graph'
-import { fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities.js'
-import { fetchNotices } from '../crt/notices.js'
-import { conflatePoints } from '../conflate.js'
-import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline.js'
-import { extractPois } from '../pois.js'
+import { fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities'
+import { fetchNotices } from '../crt/notices'
+import { conflatePoints } from '../conflate'
+import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
+import { extractPois } from '../pois'
 
 interface Args {
   pbf: string

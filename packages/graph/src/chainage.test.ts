@@ -6,7 +6,7 @@ import {
   pointAtChainage,
   projectOntoChainage,
   type LonLat,
-} from './chainage.js'
+} from './chainage'
 
 // A straight north–south "canal" near Braunston (~52.29°N): vertices every
 // 0.001° latitude ≈ 111.2 m apart.

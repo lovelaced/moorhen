@@ -1,3 +1,3 @@
-export * from './notices.js'
-export * from './facilities.js'
-export * from './fhrs.js'
+export * from './notices'
+export * from './facilities'
+export * from './fhrs'

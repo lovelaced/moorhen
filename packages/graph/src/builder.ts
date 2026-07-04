@@ -1,10 +1,10 @@
-import { haversineMeters, type LonLat } from './chainage.js'
+import { haversineMeters, type LonLat } from './chainage'
 import {
   classifyWaterway,
   lockGaugeFromTags,
   type Classification,
   type NavigableClass,
-} from './classification.js'
+} from './classification'
 
 /**
  * Builds the routable waterway graph from OSM-shaped input:

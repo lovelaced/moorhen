@@ -6,7 +6,7 @@ import {
   estimateJourney,
   shortestRoute,
 } from '@moorhen/graph'
-import { parseOpl } from '../src/osm/opl.js'
+import { parseOpl } from '../src/osm/opl'
 
 /**
  * Golden tests against a real OSM extract around Braunston (the crossroads of

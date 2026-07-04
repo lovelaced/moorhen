@@ -1,4 +1,4 @@
-import type { WaterwayEdge, WaterwayGraph } from './builder.js'
+import type { WaterwayEdge, WaterwayGraph } from './builder'
 
 /**
  * Shortest-path routing over the waterway graph. Small graph (a few thousand

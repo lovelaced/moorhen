@@ -1,5 +1,5 @@
 import { parseEstablishmentsResponse, type ParseEstablishmentsResult } from '@moorhen/schema'
-import { ETL_USER_AGENT } from '../crt/notices.js'
+import { ETL_USER_AGENT } from '../crt/notices'
 
 /** Licence-registry id — checked by scripts/check-registry.mjs. */
 export const SOURCE_ID = 'fsa-fhrs'

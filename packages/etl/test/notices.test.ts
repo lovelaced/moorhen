@@ -5,7 +5,7 @@ import {
   NAVIGATION_BLOCKING_TYPE_IDS,
   parseNoticesResponse,
 } from '@moorhen/schema'
-import { ETL_USER_AGENT, buildNoticesUrl, fetchNotices } from '../src/crt/notices.js'
+import { ETL_USER_AGENT, buildNoticesUrl, fetchNotices } from '../src/crt/notices'
 
 const fixtureRaw = readFileSync(
   new URL('./fixtures/notices-2026-07-04.json', import.meta.url),
