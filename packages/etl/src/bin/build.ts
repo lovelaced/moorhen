@@ -21,7 +21,7 @@ import { fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities'
 import { fetchNotices } from '../crt/notices'
 import { conflatePoints } from '../conflate'
 import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
-import { extractPois } from '../pois'
+import { corridorCells, extractPois } from '../pois'
 import { buildOverlayTiles, corridorFromGraph, writeCorridor } from '../tiles'
 
 interface Args {
@@ -99,7 +99,11 @@ async function main(): Promise<void> {
   manifest['vertices'] = graph.vertices.size
   manifest['locks'] = graph.edges.reduce((s, e) => s + e.narrowLocks + e.broadLocks, 0)
 
-  const pois = extractPois(data.nodes.values())
+  const cells = corridorCells(
+    graph.edges.map((e) => e.geometry),
+    0.05,
+  )
+  const pois = extractPois(data, { corridorCells: cells })
   await writeFile(
     join(args.out, 'osm-pois.geojson'),
     JSON.stringify({

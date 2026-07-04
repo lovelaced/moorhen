@@ -19,7 +19,9 @@ export const WATERWAY_FILTER_ARGS = [
   'w/waterway=canal,river',
   'w/lock=yes',
   'n/waterway=lock_gate,water_point,sanitary_dump_station,turning_point',
-  'n/amenity=pub,drinking_water',
+  'nw/waterway=fuel',
+  'nw/amenity=pub,drinking_water',
+  'nw/shop=convenience,supermarket,farm,bakery,butcher,greengrocer,deli,laundry,dry_cleaning,boat',
 ] as const
 
 /**

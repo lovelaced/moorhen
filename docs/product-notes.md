@@ -21,3 +21,38 @@ Canals and locks are gauge-classified (`narrow` ~7 ft vs `broad` ~14 ft) through
 ## [redacted] (owner, 2026-07-04)
 
 No outreach emails yet — drafts stay in `docs/outreach/` until the owner decides the time is right (likely when Moorhen is demoable). Deep links fine; zero automated ingestion (see `docs/[redacted].md`).
+
+## Mooring auto-detection → private coverage & mooring map (owner, 2026-07-04)
+
+When cruise tracking believes the boat has been **stationary for over an hour**, send a
+local notification: "Moored up? Log this spot." One tap opens a capture sheet:
+
+- **Speed test** (one tap): download/upload/latency via the current network + operator
+  name — auto-captures per-network signal (the Ofcom-beating ground truth)
+- **Photo of the mooring** (camera or roll; EXIF GPS stripped on ingest as designed)
+- Quick facts: rings/armco/pins, depth felt, noise (optional, one-tap chips)
+
+Storage: **private to the user by default** (device + their private sync partition).
+Sharing to the community layer is an explicit opt-in per entry, never bulk.
+Over time this builds each boater's personal map of good moorings + cell coverage;
+aggregated (opt-in, anonymised) it becomes the network-wide coverage map.
+
+**Map presentation:** the user's own moorings render as **photo pins** — round
+photo inside a pin, Google-Maps-featured-place style. Implementation: MapLibre
+symbol layer with runtime-generated circular-cropped images (`Images` +
+per-mooring thumbnails), falling back to an anchor glyph when no photo.
+
+Detection heuristic (cruise mode already tracks chainage): stationary =
+chainage movement < 50 m over 60 min while cruise session active; also fire a
+gentler prompt when a cruise session _ends_ near a plausible mooring. Never
+auto-log location without the user tapping the notification (privacy principle).
+
+## Layer chips: pubs and shops are separate; fuel is first-class (owner, 2026-07-04)
+
+- **Pubs** and **Shops** get separate chips/layers (different errands).
+- **Diesel** (waterway fuel points, boatyards selling fuel, chandleries) and
+  **Pump-out** are first-class layers alongside Water and Elsan — they're the
+  errands that actually shape a liveaboard's week. Laundry too (post-Nov-2025
+  facility closures made laundrettes acute).
+- ETL: OSM shops/pubs/fuel/chandlery/laundry extracted from nodes AND building
+  ways (centroids), clipped to the canal corridor so the POI artifact stays lean.
