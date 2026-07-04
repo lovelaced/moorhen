@@ -15,12 +15,15 @@ Two artifacts, both PMTiles (single files, HTTP range-request friendly, MapLibre
 | Overlay tiles (incl. national CRT facilities layer) | ~1 MB                                                  |
 | Per-km basemap cost                                 | ~120 KB/km (dominated by town tiles, not waterway km)  |
 
-**GB extrapolation:** ~5,000 km navigable network → **~500–700 MB** full-corridor
-basemap at maxzoom 15; **roughly half at maxzoom 14** (`--maxzoom=14`), which is
-likely the right default download. Dense urban networks (BCN, London) share
-corridor cells, which pulls the real number down; the first nightly GB run
-gives the exact figure. Ship the corridor extract as the default in-app
-download, full-GB as an option — per plan.
+**GB measured (2026-07-04):** the real navigable network is **10,383 km**
+(4,666 edges; boat-tagged tidal rivers doubled the early 5,000 km estimate) and
+the full corridor basemap at **maxzoom 14 = 896 MB** (90,372 tiles, ~15 min
+remote extract). One 896 MB download is too heavy as the only option, so the
+plan is **regional offline downloads**: group corridor cells by canal region
+(London & South East, Midlands, North West, Yorkshire & North East, Wales &
+Borders, Scotland) → each region lands in the 100–250 MB range, which is the
+Organic-Maps-style UX boaters already know. Full-GB stays available for the
+completists. The 9.6 MB national overlay (our data) always ships whole.
 
 ## Rivers are filtered to navigable
 
