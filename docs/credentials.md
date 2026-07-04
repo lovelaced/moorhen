@@ -80,3 +80,25 @@ Run `npx eas login` (create the free expo.dev account first). No key hand-off.
   the healthcheck URL can only say "I'm alive".
 - Never commit: FCM JSON, service_role key, R2 secret. (CI's licence/registry gates don't cover
   secrets — `.env*` and key files are already gitignored.)
+
+---
+
+## Status (2026-07-04)
+
+| Item                                                               | State                                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Cloudflare account + R2 `moorhen-data` bucket                      | ✅ done                                                       |
+| KV namespace `SEEN_KV` (`dc5526e1…`)                               | ✅ created                                                    |
+| Worker `moorhen-notices` deployed, cron */15                       | ✅ **live**                                                   |
+| `FCM_SERVICE_ACCOUNT` secret (moorhen-notices@moorhen.iam)         | ✅ set                                                        |
+| workers.dev subdomain (`moorhen.workers.dev`, worker unrouted)     | ✅ registered (API requirement for cron)                      |
+| R2 dev CDN (`https://pub-e452fe7a39ba403e8c67f2140e5dd064.r2.dev`) | ✅ enabled; dev artifacts uploaded under `data/dev/`          |
+| healthchecks.io                                                    | ⏭ skipped for now (binding optional)                          |
+| GitHub: `gh auth login` + repo + Actions secrets (R2 keys)         | ⬜ pending                                                    |
+| Supabase (Phase 4)                                                 | ⬜ pending (`brew install supabase/tap/supabase` when needed) |
+
+Dev CDN URLs (Northamptonshire data until the GB nightly runs):
+
+- `…r2.dev/data/dev/basemap.pmtiles` (46 MB, range requests OK)
+- `…r2.dev/data/dev/overlay.pmtiles`, `waterways.geojson`, `graph.json`, `osm-pois.geojson`, `manifest.json`
+- Worker will write live `data/latest/notices.json` every 15 min
