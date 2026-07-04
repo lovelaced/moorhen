@@ -141,6 +141,10 @@ importers:
       '@moorhen/schema':
         specifier: workspace:*
         version: link:../schema
+    devDependencies:
+      '@types/geojson':
+        specifier: ^7946.0.16
+        version: 7946.0.16
 
   packages/graph: {}
 

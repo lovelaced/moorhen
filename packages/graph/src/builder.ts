@@ -2,6 +2,7 @@ import { haversineMeters, type LonLat } from './chainage'
 import {
   classifyWaterway,
   lockGaugeFromTags,
+  NAVIGABLE_RIVERS,
   type Classification,
   type NavigableClass,
 } from './classification'
@@ -45,12 +46,23 @@ export interface WaterwayGraph {
   edges: WaterwayEdge[]
 }
 
-const NAVIGABLE_WATERWAYS = new Set(['canal', 'river'])
+const BOAT_ACCESS_YES = new Set(['yes', 'designated', 'permissive'])
 
 function isNavigableWay(tags: Record<string, string>): boolean {
-  if (!NAVIGABLE_WATERWAYS.has(tags['waterway'] ?? '')) return false
+  const waterway = tags['waterway'] ?? ''
   if (tags['disused'] === 'yes' || tags['abandoned'] === 'yes') return false
-  return true
+  if (waterway === 'canal') return true
+  if (waterway !== 'river') return false
+  // Rivers must be explicitly navigable: boat access tags, or the curated
+  // navigations list — GB has vastly more unnavigable river than navigable.
+  if (
+    BOAT_ACCESS_YES.has(tags['boat'] ?? '') ||
+    BOAT_ACCESS_YES.has(tags['motorboat'] ?? '') ||
+    BOAT_ACCESS_YES.has(tags['ship'] ?? '')
+  ) {
+    return true
+  }
+  return NAVIGABLE_RIVERS.has(tags['name'] ?? '')
 }
 
 interface Segment {

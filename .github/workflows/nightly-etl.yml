@@ -30,11 +30,29 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y osmium-tool
       - run: pnpm registry:check
 
+      - name: Install tippecanoe (overlay tiles)
+        run: |
+          git clone --depth 1 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          sudo make -C /tmp/tippecanoe install
+
+      - name: Install pmtiles CLI (basemap extract)
+        run: |
+          curl -sSL https://github.com/protomaps/go-pmtiles/releases/latest/download/go-pmtiles_Linux_x86_64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin pmtiles
+
       - name: Download Geofabrik GB extract
         run: curl -sSL --retry 3 -o gb.osm.pbf https://download.geofabrik.de/europe/great-britain-latest.osm.pbf
 
-      - name: Build artifacts
-        run: pnpm etl:build --pbf gb.osm.pbf --out artifacts
+      - name: Build artifacts (incl. corridor + overlay tiles)
+        run: pnpm etl:build --pbf gb.osm.pbf --out artifacts --tiles
+
+      - name: Extract corridor basemap from Protomaps daily build
+        run: |
+          BUILD=$(date -u -d "yesterday" +%Y%m%d)
+          pmtiles extract "https://build.protomaps.com/${BUILD}.pmtiles" \
+            artifacts/basemap.pmtiles --region=artifacts/corridor.geojson --maxzoom=14
+          ls -la artifacts/basemap.pmtiles
 
       - name: Drift check vs last manifest
         run: |

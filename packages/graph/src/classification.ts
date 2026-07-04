@@ -124,3 +124,57 @@ export function lockGaugeFromTags(tags: Record<string, string>, fallback: LockGa
   }
   return fallback
 }
+
+/**
+ * Inland rivers with navigations (public-knowledge facts, keyed by OSM name).
+ * Rivers not listed here and without boat=yes tags are excluded from the
+ * graph and the offline-map corridor — GB has tens of thousands of km of
+ * unnavigable rivers and brooks tagged waterway=river.
+ */
+export const NAVIGABLE_RIVERS: ReadonlySet<string> = new Set([
+  'River Thames',
+  'River Trent',
+  'River Severn',
+  'River Nene',
+  'River Great Ouse',
+  'River Cam',
+  'River Soar',
+  'River Avon', // Warwickshire and Bristol Avons — both navigable
+  'River Weaver',
+  'Weaver Navigation',
+  'River Ouse',
+  'River Aire',
+  'River Calder',
+  'River Don',
+  'River Medway',
+  'River Wey',
+  'Wey Navigation',
+  'River Lee',
+  'River Lea',
+  'Lee Navigation',
+  'River Lee Navigation',
+  'River Stort',
+  'River Ancholme',
+  'River Witham',
+  'River Welland',
+  'River Glen',
+  'River Hull',
+  'River Derwent',
+  'River Ure',
+  'River Foss',
+  'River Idle',
+  'River Yare',
+  'River Bure',
+  'River Waveney',
+  'River Ant',
+  'River Thurne',
+  'River Chet',
+  'River Wensum',
+  'River Chelmer',
+  'Chelmer & Blackwater Navigation',
+  'River Frome',
+  'River Fossdyke',
+  'Fossdyke Navigation',
+  'River Tees',
+  'River Wharfe',
+])

@@ -10,5 +10,8 @@
   "dependencies": {
     "@moorhen/graph": "workspace:*",
     "@moorhen/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16"
   }
 }

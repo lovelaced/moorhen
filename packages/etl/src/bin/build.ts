@@ -22,11 +22,13 @@ import { fetchNotices } from '../crt/notices'
 import { conflatePoints } from '../conflate'
 import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
 import { extractPois } from '../pois'
+import { buildOverlayTiles, corridorFromGraph, writeCorridor } from '../tiles'
 
 interface Args {
   pbf: string
   out: string
   offline: boolean
+  tiles: boolean
   noticesDays: number
 }
 
@@ -45,6 +47,7 @@ function parseArgs(argv: string[]): Args {
     pbf,
     out,
     offline: argv.includes('--offline'),
+    tiles: argv.includes('--tiles'),
     noticesDays: Number(get('--notices-days') ?? 56),
   }
 }
@@ -113,6 +116,16 @@ async function main(): Promise<void> {
   console.log(
     `[osm] graph: ${graph.edges.length} edges, ${manifest['locks']} locks; ${pois.length} POIs`,
   )
+
+  if (args.tiles) {
+    // corridor polygon (clips the offline basemap download) + overlay tiles
+    const corridorPath = await writeCorridor(args.out, corridorFromGraph(graph))
+    console.log(`[tiles] corridor polygon → ${corridorPath}`)
+    const overlay = await buildOverlayTiles({ artifactsDir: args.out })
+    if (overlay) console.log(`[tiles] overlay tiles → ${overlay}`)
+    else console.warn('[tiles] tippecanoe not installed — skipped overlay.pmtiles')
+    manifest['overlayTiles'] = overlay !== null
+  }
 
   if (!args.offline) {
     // 2. CRT facilities (all legacy layers, master layer normalized)
