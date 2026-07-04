@@ -1,7 +1,17 @@
 import Feather from '@expo/vector-icons/Feather'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
+import { useCallback, useState } from 'react'
+import type { NativeSyntheticEvent } from 'react-native'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import {
+  DetailSheet,
+  selectFacility,
+  selectLock,
+  selectMooring,
+  selectPoi,
+  type SelectedFeature,
+} from '../../components/detail-sheet'
 import { urls } from '../../data'
 import { day, font, radius, shadow } from '../../theme'
 
@@ -35,20 +45,46 @@ const LAYER_CHIPS = [
   { key: 'stoppages', label: 'Stoppages', icon: 'alert-triangle', active: false },
 ] as const
 
+type FeaturePress = NativeSyntheticEvent<{ features: GeoJSON.Feature[] }>
+
 export default function MapScreen() {
+  const [selected, setSelected] = useState<SelectedFeature | null>(null)
+
+  const onFeaturePress = useCallback(
+    (select: (feature: GeoJSON.Feature) => SelectedFeature) => (event: FeaturePress) => {
+      const feature = event.nativeEvent.features[0]
+      if (feature) setSelected(select(feature))
+    },
+    [],
+  )
+
   return (
     <View style={styles.root}>
       {MapLibre ? (
         <MapLibre.Map
           style={StyleSheet.absoluteFill}
           mapStyle="https://tiles.openfreemap.org/styles/liberty"
+          onPress={() => setSelected(null)}
         >
           {/* Braunston — the crossroads of the network — until location wiring lands */}
           <MapLibre.Camera initialViewState={{ center: [-1.21, 52.29], zoom: 11 }} />
+
           <MapLibre.GeoJSONSource id="waterways" data={urls.waterways}>
+            {/* derelict/unrestored: pale, dashed, clearly not navigable */}
+            <MapLibre.Layer
+              type="line"
+              id="waterway-derelict"
+              filter={['==', ['get', 'class'], 'derelict-canal']}
+              paint={{
+                'line-color': '#A9B6BC',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.2, 14, 3.5],
+                'line-dasharray': [2, 2.5],
+              }}
+            />
             <MapLibre.Layer
               type="line"
               id="waterway-casing"
+              filter={['!=', ['get', 'class'], 'derelict-canal']}
               paint={{
                 'line-color': '#CFE0E6',
                 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 14, 12],
@@ -58,6 +94,7 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="line"
               id="waterway-line"
+              filter={['!=', ['get', 'class'], 'derelict-canal']}
               paint={{
                 // wide vs narrow is first-class: broad canals draw heavier & deeper
                 'line-color': [
@@ -82,7 +119,30 @@ export default function MapScreen() {
               layout={{ 'line-cap': 'round' }}
             />
           </MapLibre.GeoJSONSource>
-          <MapLibre.GeoJSONSource id="facilities" data={urls.facilities}>
+
+          <MapLibre.GeoJSONSource
+            id="moorings"
+            data={urls.moorings}
+            onPress={onFeaturePress(selectMooring)}
+          >
+            <MapLibre.Layer
+              type="line"
+              id="mooring-lines"
+              minzoom={11}
+              filter={['==', ['get', 'access'], 'public']}
+              paint={{
+                'line-color': day.green,
+                'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 8],
+                'line-opacity': 0.85,
+              }}
+            />
+          </MapLibre.GeoJSONSource>
+
+          <MapLibre.GeoJSONSource
+            id="facilities"
+            data={urls.facilities}
+            onPress={onFeaturePress(selectFacility)}
+          >
             <MapLibre.Layer
               type="circle"
               id="facility-dots"
@@ -95,11 +155,16 @@ export default function MapScreen() {
               }}
             />
           </MapLibre.GeoJSONSource>
-          <MapLibre.GeoJSONSource id="pois" data={urls.pois}>
+
+          <MapLibre.GeoJSONSource id="pois" data={urls.pois} onPress={onFeaturePress(selectPoi)}>
             <MapLibre.Layer
               type="circle"
               id="poi-dots"
               minzoom={11}
+              filter={[
+                '!',
+                ['in', ['get', 'category'], ['literal', ['winding-hole', 'lock-gate']]],
+              ]}
               paint={{
                 'circle-color': [
                   'match',
@@ -118,13 +183,47 @@ export default function MapScreen() {
                   day.billYellow,
                   'chandlery',
                   day.waterDeep,
-                  'lock-gate',
-                  '#8FA3AC',
                   day.ink3,
                 ],
                 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 6],
                 'circle-stroke-color': '#FFFFFF',
                 'circle-stroke-width': 1,
+              }}
+            />
+            {/* winding holes: where you can actually turn — bigger, ringed */}
+            <MapLibre.Layer
+              type="circle"
+              id="winding-holes"
+              minzoom={10}
+              filter={['==', ['get', 'category'], 'winding-hole']}
+              paint={{
+                'circle-color': day.surface,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 8],
+                'circle-stroke-color': day.waterDeep,
+                'circle-stroke-width': 2.5,
+              }}
+            />
+          </MapLibre.GeoJSONSource>
+
+          <MapLibre.GeoJSONSource id="locks" data={urls.locks} onPress={onFeaturePress(selectLock)}>
+            {/* chevron points uphill; narrow locks lighter than broad */}
+            <MapLibre.Layer
+              type="symbol"
+              id="lock-symbols"
+              minzoom={10}
+              layout={{
+                'text-field': '^',
+                'text-font': ['Noto Sans Bold'],
+                'text-size': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 22],
+                'text-rotate': ['get', 'bearingUpDeg'],
+                'text-rotation-alignment': 'map',
+                'text-allow-overlap': true,
+                'text-anchor': 'center',
+              }}
+              paint={{
+                'text-color': ['match', ['get', 'gauge'], 'narrow', day.water, day.waterDeep],
+                'text-halo-color': '#FFFFFF',
+                'text-halo-width': 1.8,
               }}
             />
           </MapLibre.GeoJSONSource>
@@ -168,6 +267,8 @@ export default function MapScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
+
+      {selected && <DetailSheet selected={selected} onClose={() => setSelected(null)} />}
     </View>
   )
 }

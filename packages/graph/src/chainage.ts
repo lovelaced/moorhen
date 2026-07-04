@@ -125,3 +125,13 @@ export function distanceAheadMeters(
   const d = (targetChainageMeters - boatChainageMeters) * direction
   return d >= 0 ? d : null
 }
+
+/** Initial bearing from a to b, degrees clockwise from north. */
+export function bearingDegrees(a: LonLat, b: LonLat): number {
+  const phi1 = a[1] * DEG_TO_RAD
+  const phi2 = b[1] * DEG_TO_RAD
+  const dLambda = (b[0] - a[0]) * DEG_TO_RAD
+  const y = Math.sin(dLambda) * Math.cos(phi2)
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda)
+  return (Math.atan2(y, x) * (180 / Math.PI) + 360) % 360
+}

@@ -21,6 +21,8 @@ import { fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities'
 import { fetchNotices } from '../crt/notices'
 import { conflatePoints } from '../conflate'
 import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
+import { extractLocks } from '../locks'
+import { extractDerelictCanals, extractMoorings } from '../moorings'
 import { corridorCells, extractPois } from '../pois'
 import { buildOverlayTiles, corridorFromGraph, writeCorridor } from '../tiles'
 
@@ -71,21 +73,31 @@ async function main(): Promise<void> {
   console.log(`[osm] ${data.nodes.size} nodes, ${data.ways.length} ways`)
 
   const graph = buildWaterwayGraph(data.nodes, data.ways)
+  const derelict = extractDerelictCanals(data)
   const waterways = {
     type: 'FeatureCollection',
-    features: graph.edges.map((edge) => ({
-      type: 'Feature',
-      id: edge.id,
-      geometry: { type: 'LineString', coordinates: edge.geometry },
-      properties: {
-        name: edge.name,
-        class: edge.navigableClass,
-        lengthM: Math.round(edge.lengthM),
-        narrowLocks: edge.narrowLocks,
-        broadLocks: edge.broadLocks,
-        tunnelM: Math.round(edge.tunnelM),
-      },
-    })),
+    features: [
+      ...graph.edges.map((edge) => ({
+        type: 'Feature',
+        id: edge.id,
+        geometry: { type: 'LineString', coordinates: edge.geometry },
+        properties: {
+          name: edge.name,
+          class: edge.navigableClass,
+          lengthM: Math.round(edge.lengthM),
+          narrowLocks: edge.narrowLocks,
+          broadLocks: edge.broadLocks,
+          tunnelM: Math.round(edge.tunnelM),
+        },
+      })),
+      // shown, never routed
+      ...derelict.map((way) => ({
+        type: 'Feature',
+        id: `d${way.id}`,
+        geometry: { type: 'LineString', coordinates: way.line },
+        properties: { name: way.name, class: 'derelict-canal' },
+      })),
+    ],
   }
   await writeFile(join(args.out, 'waterways.geojson'), JSON.stringify(waterways))
   await writeFile(
@@ -98,6 +110,48 @@ async function main(): Promise<void> {
   manifest['edges'] = graph.edges.length
   manifest['vertices'] = graph.vertices.size
   manifest['locks'] = graph.edges.reduce((s, e) => s + e.narrowLocks + e.broadLocks, 0)
+  manifest['derelictWays'] = derelict.length
+
+  const locks = extractLocks(data)
+  await writeFile(
+    join(args.out, 'locks.geojson'),
+    JSON.stringify({
+      type: 'FeatureCollection',
+      features: locks.map((lock) => ({
+        type: 'Feature',
+        id: lock.id,
+        geometry: { type: 'Point', coordinates: lock.point },
+        properties: {
+          name: lock.name,
+          gauge: lock.gauge,
+          waterway: lock.waterway,
+          bearingUpDeg: Math.round(lock.bearingUpDeg),
+        },
+      })),
+    }),
+  )
+  manifest['lockFeatures'] = locks.length
+
+  const moorings = extractMoorings(data)
+  await writeFile(
+    join(args.out, 'moorings.geojson'),
+    JSON.stringify({
+      type: 'FeatureCollection',
+      features: moorings.map((m) => ({
+        type: 'Feature',
+        id: m.id,
+        geometry: { type: 'LineString', coordinates: m.line },
+        properties: {
+          access: m.access,
+          name: m.name,
+          mooringType: m.mooringType,
+          maxStay: m.maxStay,
+          source: 'osm',
+        },
+      })),
+    }),
+  )
+  manifest['osmMoorings'] = moorings.length
 
   const cells = corridorCells(
     graph.edges.map((e) => e.geometry),

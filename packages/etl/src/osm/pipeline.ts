@@ -16,8 +16,9 @@ export const GEOFABRIK_GB_URL = 'https://download.geofabrik.de/europe/great-brit
  * carry waterway=canal. POI node filters ride along for the facilities layer.
  */
 export const WATERWAY_FILTER_ARGS = [
-  'w/waterway=canal,river',
+  'w/waterway=canal,river,derelict_canal',
   'w/lock=yes',
+  'w/mooring',
   'n/waterway=lock_gate,water_point,sanitary_dump_station,turning_point',
   'nw/waterway=fuel',
   'nw/amenity=pub,drinking_water',
