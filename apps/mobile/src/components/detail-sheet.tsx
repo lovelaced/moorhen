@@ -226,3 +226,34 @@ const styles = StyleSheet.create({
   },
   buttonSecondaryText: { fontFamily: font.semibold, fontSize: 13, color: day.ink },
 })
+
+export function selectWaterway(feature: GeoJSON.Feature): SelectedFeature {
+  const props = (feature.properties ?? {}) as Props
+  const classLabels: Record<string, string> = {
+    'narrow-canal': 'Narrow canal (~7 ft locks)',
+    'broad-canal': 'Broad canal (~14 ft locks)',
+    river: 'River navigation',
+    'tidal-river': 'Tidal river',
+    'commercial-waterway': 'Commercial waterway',
+    'derelict-canal': 'Derelict canal — not navigable',
+  }
+  const details: string[] = []
+  const narrow = Number(props['narrowLocks'] ?? 0)
+  const broad = Number(props['broadLocks'] ?? 0)
+  if (narrow + broad > 0) {
+    const parts = []
+    if (broad > 0) parts.push(`${broad} broad`)
+    if (narrow > 0) parts.push(`${narrow} narrow`)
+    details.push(`${narrow + broad} locks on this stretch (${parts.join(', ')})`)
+  }
+  const lengthM = Number(props['lengthM'])
+  if (Number.isFinite(lengthM) && lengthM > 0) {
+    details.push(`${(lengthM / 1609.344).toFixed(1)} mi stretch`)
+  }
+  return {
+    title: (props['name'] as string) || 'Waterway',
+    subtitle: classLabels[String(props['class'])] ?? 'Waterway',
+    details,
+    coords: pointOf(feature),
+  }
+}

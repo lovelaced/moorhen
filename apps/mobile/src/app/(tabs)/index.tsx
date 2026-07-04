@@ -13,6 +13,7 @@ import {
   selectMooring,
   selectNotice,
   selectPoi,
+  selectWaterway,
   type SelectedFeature,
 } from '../../components/detail-sheet'
 import { urls } from '../../data'
@@ -183,7 +184,11 @@ export default function MapScreen() {
   const onFeaturePress = useCallback(
     (select: (feature: GeoJSON.Feature) => SelectedFeature) => (event: FeaturePress) => {
       const feature = event.nativeEvent.features[0]
-      if (feature) setSelected(select(feature))
+      if (feature) {
+        // without this the event bubbles to Map.onPress, which clears the selection
+        event.stopPropagation()
+        setSelected(select(feature))
+      }
     },
     [],
   )
@@ -226,7 +231,11 @@ export default function MapScreen() {
           <MapLibre.UserLocation />
           <MapLibre.Images images={MARKER_IMAGES} />
 
-          <MapLibre.GeoJSONSource id="waterways" data={urls.waterways}>
+          <MapLibre.GeoJSONSource
+            id="waterways"
+            data={urls.waterways}
+            onPress={onFeaturePress(selectWaterway)}
+          >
             {/* derelict/unrestored: pale, dashed, clearly not navigable */}
             <MapLibre.Layer
               type="line"
@@ -285,12 +294,12 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="line"
               id="mooring-lines"
-              minzoom={11}
+              minzoom={10}
               filter={['==', ['get', 'access'], 'public']}
               layout={{ visibility: active.has('moorings') ? 'visible' : 'none' }}
               paint={{
                 'line-color': day.green,
-                'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 8],
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 8],
                 'line-opacity': 0.85,
               }}
             />
@@ -304,7 +313,7 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="facility-badges"
-              minzoom={9}
+              minzoom={8}
               filter={
                 activeFacilityServices.length > 0
                   ? ([
@@ -315,7 +324,7 @@ export default function MapScreen() {
               }
               layout={{
                 'icon-image': 'facility',
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.55],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.28, 14, 0.55],
                 'icon-allow-overlap': true,
               }}
             />
@@ -325,7 +334,7 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="poi-badges"
-              minzoom={11}
+              minzoom={9}
               filter={
                 [
                   'all',
@@ -335,7 +344,7 @@ export default function MapScreen() {
               }
               layout={{
                 'icon-image': POI_ICON as string,
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.35, 14, 0.58],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58],
                 'icon-allow-overlap': false,
               }}
             />

@@ -1,60 +1,67 @@
 # Moorhen 🐦
 
-**The open-source UK canal & mooring companion** — built for people who live on the cut.
+**The open-source canal companion for the UK waterways** — built for people who live on the cut.
 
-Moorhen combines every open data source about the UK waterways (Canal & River Trust, OpenStreetMap, Environment Agency, Food Standards Agency, and more) with a community layer that answers the questions no static guide can:
+[![CI](https://github.com/lovelaced/moorhen/actions/workflows/ci.yml/badge.svg)](https://github.com/lovelaced/moorhen/actions/workflows/ci.yml)
+[![Nightly data](https://github.com/lovelaced/moorhen/actions/workflows/nightly-etl.yml/badge.svg)](https://github.com/lovelaced/moorhen/actions/workflows/nightly-etl.yml)
+[![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue.svg)](LICENSE)
 
-- _Is that water point actually working today?_
-- _Is there a stoppage ahead of me, in the direction I'm heading?_
-- _Can my 62-footer actually get into the bank at this mooring — and is there a pub, a shop, and 4G?_
-- _Where's my movement log when CRT asks?_
+Every existing canal tool covers static geography. The questions boaters actually have are _temporal_: **Is that water point working today? Is there a stoppage ahead — in my direction? Can my boat actually get into the bank here, and is there a pub, a shop, and 4G?** Moorhen answers those, offline-first, free forever, ad-free forever.
 
-## Principles
+|                                                    |                                               |                                          |
+| -------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
+| ![Locks with direction](docs/images/map-locks.png) | ![Service badges](docs/images/map-badges.png) | ![Map home](docs/images/map-home.png)    |
+| _Lock chevrons point uphill; winding holes ringed_ | _Water, diesel, pubs — 20 min walk max_       | _Wide vs narrow canals drawn distinctly_ |
 
-1. **Offline-first.** There is no signal on the cut. Maps, search, routing, and logging all work in airplane mode.
-2. **Privacy-first.** No public boat positions, ever. Reviews attach to _places_, never to boats. Movement logs are private by default and exportable only by you.
-3. **Free forever, ad-free forever.** Partly by conviction, partly by licence: our upstream data terms (CRT, Open-Meteo) prohibit commercial use. Donations and grants fund the ~£110/yr the project actually costs.
-4. **Provenance everywhere.** Every datum shows where it came from and how fresh it is. Data stores with different licences are never merged (see `docs/licensing.md`).
-5. **Give back.** Durable facts (water points, moorings) get upstreamed to OpenStreetMap; we deep-link to [redacted] and the CRT app rather than replacing what already works (see `docs/[redacted].md`).
+## What works today
 
-## Architecture (one paragraph)
+- 🗺️ **The whole navigable network** — 10,383 km from OpenStreetMap, wide and narrow canals drawn distinctly, derelict canals dashed, rivers classified; routable graph with 1,966 gauge-classified locks
+- 🔒 **Locks like a paper map** — one chevron per chamber, pointing uphill, tappable (name, gauge, waterway)
+- 🍺 **Services within a 20-minute walk of the cut** — pubs, shops, laundries, boat fuel, chandleries, Elsan, pump-outs, bins, railway stations; every marker tappable with distance-from-towpath and a Street View jump
+- ⚠️ **Live stoppages** — a Cloudflare Worker polls CRT notices every 15 min, publishes to the CDN, and pushes FCM alerts per waterway (only Published navigation-blocking notices — no noise)
+- 🧭 **Journey timing that respects reality** — lock-miles model with per-section speed factors, direction-dependent current (the Llangollen problem), narrow/broad lock rates, tunable pace
+- 📱 **The app** — Expo/React Native + MapLibre, warm modern design, rotation with re-north compass, locate-me, functional layer chips
+- 🔄 **Self-refreshing data platform** — nightly GitHub Actions rebuild from OSM + CRT + FSA, drift-checked, published to Cloudflare R2 (free tier, £0/month infrastructure)
 
-An Expo/React Native app reading **versioned static artifacts** (PMTiles basemap, GeoJSON layers, a bundled waterway graph) built nightly by GitHub Actions from open data and served from Cloudflare R2; a **Cloudflare Worker cron** polls CRT stoppage notices every 15 minutes and fans out FCM push alerts per waterway; a small **Supabase** Postgres holds only what users create (facility status reports, mooring reviews, private logs) behind row-level security with anonymous-first auth. Infrastructure cost: £0/month.
+## Roadmap (see `docs/`)
 
-## Repository layout
-
-| Path               | What                                                                                            |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| `apps/mobile/`     | Expo app (TypeScript)                                                                           |
-| `packages/etl/`    | Data pipelines: OSM, CRT, FHRS fetchers → validated artifacts                                   |
-| `packages/graph/`  | Waterway graph, chainage/linear-referencing, routing, direction detection (shared by app + ETL) |
-| `packages/schema/` | Zod schemas — the data contract for every published artifact                                    |
-| `workers/notices/` | Cloudflare Worker: poll CRT notices, diff, publish, push                                        |
-| `supabase/`        | Migrations, RLS policies                                                                        |
-| `data/registry/`   | Machine-readable licence registry — CI fails if code ingests an unregistered/disallowed source  |
-| `docs/`            | Licensing, data sources, architecture decisions                                                 |
+Cruise mode with **directional stoppage alerts** ("closed 4.8 mi ahead — last good mooring before it: …") · **moored-up detection** → one-tap speed test + photo → private mooring/coverage map with photo pins · community facility status ("confirmed working 2 h ago by 3 boaters") · structured mooring reviews (rings/armco/pins, depth, noise) · CC movement log with CRT evidence export · offline PMTiles regions · winter-works date-clash warnings on routes.
 
 ## Development
 
 ```sh
 pnpm install
-pnpm test            # vitest
-pnpm typecheck
-pnpm lint
-pnpm registry:check  # licence gate
+pnpm test                 # 82 tests: golden-tested against real OSM extracts & live-captured API fixtures
+pnpm typecheck && pnpm typecheck:mobile
+pnpm registry:check       # licence gate — every data source must be registered & allowed
+
+# data build (needs osmium; tippecanoe optional for tiles)
+pnpm etl:build --pbf great-britain-latest.osm.pbf --out artifacts --tiles
+
+# app (dev build required for the native map — Expo Go shows a placeholder)
+cd apps/mobile && npx expo run:android
 ```
 
-## Roadmap
+| Path               | What                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `apps/mobile/`     | Expo app                                                             |
+| `packages/graph/`  | Waterway graph, routing, chainage, timing, direction detection       |
+| `packages/etl/`    | Data pipelines (OSM, CRT, FSA) → versioned artifacts                 |
+| `packages/schema/` | Zod contracts for everything published                               |
+| `workers/notices/` | CRT notice poller + FCM push (Cloudflare Worker)                     |
+| `data/registry/`   | Machine-readable licence registry — CI fails on unregistered sources |
+| `docs/`            | Product notes, data sources, licensing, tiles, credentials           |
 
-- **Phase 1 — Data platform**: nightly ETL → tested, versioned artifacts on a CDN
-- **Phase 2 — Map + reference**: offline map, all layers, search, street-level imagery
-- **Phase 3 — Routing, cruise mode & alerts**: "stoppage ahead, in your direction" push
-- **Phase 4 — Community layer**: live facility status, structured mooring reviews, signal reports
-- **Phase 5 — Liveaboard toolkit**: CC movement log + evidence pack, river levels, fuel boats
-- **Phase 6 — Ecosystem**: stores, web companion, OSM upstreaming, governance & grants
+## Data & licensing
 
-## Licences
+Three separately-provenanced stores, never merged (see `docs/licensing.md`): OpenStreetMap (ODbL), official sources (CRT/EA/FSA/OS, per-dataset licences), and the community layer (ODbL, upstreamable to OSM). The CRT centreline is deliberately **not** used (licence ambiguity); OSM geometry is complete and clean. **No ads or paid tiers, ever** — partly conviction, partly licence-compelled (CRT + Open-Meteo non-commercial terms). We never scrape [redacted] (`docs/[redacted].md`).
 
-- Code: **GPL-3.0-only**
-- Community database (when live): **ODbL**, with contributor terms permitting upstreaming of facts to OSM
-- Map data: © OpenStreetMap contributors (ODbL) · © Canal & River Trust · EA/FSA/OS data under OGL v3 — full details in `docs/licensing.md` and `data/registry/sources.json`
+Map data © OpenStreetMap contributors · Boater facility data © The Canal & River Trust copyright and database rights reserved · Hygiene ratings: Food Standards Agency (OGL) · River data: Environment Agency (OGL).
+
+## Disclaimers
+
+Moorhen is an independent open-source project, **not affiliated with the Canal & River Trust**. Data can be wrong or stale — always follow signage and official notices on the water, and never rely on any app as your sole aid to navigation.
+
+## Licence
+
+Code GPL-3.0-only. Community data ODbL. Contributions welcome — the licence registry and tests will keep us all honest.
