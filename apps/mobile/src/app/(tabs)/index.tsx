@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { SearchModal, type SearchEntry } from '../../components/search-modal'
+import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
 import {
   DetailSheet,
   selectFacility,
@@ -144,6 +146,10 @@ export default function MapScreen() {
   const [selected, setSelected] = useState<SelectedFeature | null>(null)
   const [active, setActive] = useState<Set<ChipKey>>(new Set(['moorings', 'water']))
   const [stoppages, setStoppages] = useState<GeoJSON.FeatureCollection | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
+  const [route, setRoute] = useState<PlannedRoute | null>(null)
+  const [planning, setPlanning] = useState(false)
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
   useEffect(() => {
@@ -193,6 +199,58 @@ export default function MapScreen() {
     [],
   )
 
+  const onLongPress = useCallback(
+    async (
+      event: NativeSyntheticEvent<{ lngLat: [number, number] | { lng: number; lat: number } }>,
+    ) => {
+      const raw = event.nativeEvent.lngLat
+      const point: [number, number] = Array.isArray(raw) ? [raw[0], raw[1]] : [raw.lng, raw.lat]
+      if (route || (!routeStart && !planning)) {
+        setRoute(null)
+        setRouteStart(point)
+        return
+      }
+      if (!routeStart || planning) return
+      setPlanning(true)
+      try {
+        const graph = await loadGraph()
+        setRoute(planRoute(graph, routeStart, point))
+      } catch {
+        setRoute(null)
+      } finally {
+        setPlanning(false)
+        setRouteStart(null)
+      }
+    },
+    [route, routeStart, planning],
+  )
+
+  const onSearchSelect = useCallback((entry: SearchEntry) => {
+    setSearchOpen(false)
+    cameraRef.current?.easeTo({ center: entry.point, zoom: 14, duration: 700 })
+    setSelected({ title: entry.name, subtitle: entry.kind, details: [], coords: entry.point })
+  }, [])
+
+  const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
+    const features: GeoJSON.Feature[] = []
+    if (route) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: route.line as [number, number][] },
+        properties: { part: 'line' },
+      })
+    }
+    if (routeStart) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: routeStart },
+        properties: { part: 'start' },
+      })
+    }
+    if (features.length === 0) return null
+    return { type: 'FeatureCollection', features }
+  }, [route, routeStart])
+
   const locateMe = useCallback(async () => {
     const permission = await Location.requestForegroundPermissionsAsync()
     if (!permission.granted) return
@@ -220,6 +278,7 @@ export default function MapScreen() {
           style={StyleSheet.absoluteFill}
           mapStyle="https://tiles.openfreemap.org/styles/liberty"
           onPress={() => setSelected(null)}
+          onLongPress={onLongPress}
           compass={true}
           compassPosition={{ top: 118, right: 10 }}
         >
@@ -416,6 +475,33 @@ export default function MapScreen() {
             />
           </MapLibre.GeoJSONSource>
 
+          {routeShape && (
+            <MapLibre.GeoJSONSource id="route" data={routeShape}>
+              <MapLibre.Layer
+                type="line"
+                id="route-line"
+                filter={['==', ['get', 'part'], 'line']}
+                paint={{
+                  'line-color': day.greenDark,
+                  'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 14, 8],
+                  'line-opacity': 0.9,
+                }}
+                layout={{ 'line-cap': 'round' }}
+              />
+              <MapLibre.Layer
+                type="circle"
+                id="route-points"
+                filter={['==', ['get', 'part'], 'start']}
+                paint={{
+                  'circle-color': day.greenDark,
+                  'circle-radius': 8,
+                  'circle-stroke-color': '#FFFFFF',
+                  'circle-stroke-width': 2.5,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
+
           {stoppages && (
             <MapLibre.GeoJSONSource
               id="stoppages"
@@ -449,10 +535,10 @@ export default function MapScreen() {
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.searchRow}>
-          <View style={[styles.searchPill, shadow.pill]}>
+          <Pressable style={[styles.searchPill, shadow.pill]} onPress={() => setSearchOpen(true)}>
             <Feather name="search" size={18} color={day.ink3} />
             <Text style={styles.searchText}>Search locks, moorings, places…</Text>
-          </View>
+          </Pressable>
           <View style={[styles.roundButton, shadow.pill]}>
             <Feather name="layers" size={20} color={day.ink} />
           </View>
@@ -479,7 +565,44 @@ export default function MapScreen() {
             )
           })}
         </ScrollView>
+
+        {planning && (
+          <View style={[styles.routeCard, shadow.card]}>
+            <Text style={styles.routeTitle}>Planning route…</Text>
+          </View>
+        )}
+        {!planning && routeStart && !route && (
+          <View style={[styles.routeCard, shadow.card]}>
+            <Text style={styles.routeHint}>Start set — long-press your destination</Text>
+          </View>
+        )}
+        {route && (
+          <View style={[styles.routeCard, shadow.card]}>
+            <View style={styles.routeText}>
+              <Text style={styles.routeTitle}>
+                {route.durationLabel} · {(route.distanceM / 1609.344).toFixed(1)} mi
+              </Text>
+              <Text style={styles.routeMeta}>
+                {route.narrowLocks + route.broadLocks} lock
+                {route.narrowLocks + route.broadLocks === 1 ? '' : 's'}
+                {route.narrowLocks + route.broadLocks > 0
+                  ? ` (${route.broadLocks} broad, ${route.narrowLocks} narrow)`
+                  : ''}
+                {route.cruisingDays > 1 ? ` · ~${Math.ceil(route.cruisingDays)} cruising days` : ''}
+              </Text>
+            </View>
+            <Pressable onPress={() => setRoute(null)} hitSlop={12}>
+              <Feather name="x" size={18} color={day.ink3} />
+            </Pressable>
+          </View>
+        )}
       </SafeAreaView>
+
+      <SearchModal
+        visible={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelect={onSearchSelect}
+      />
 
       <Pressable style={[styles.locateButton, shadow.pill]} onPress={locateMe}>
         <Feather name="crosshair" size={20} color={day.ink} />
@@ -539,6 +662,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipsRow: { gap: 8, paddingRight: 16 },
+  routeCard: {
+    backgroundColor: day.surface,
+    borderRadius: radius.card,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  routeText: { flex: 1, gap: 2 },
+  routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
+  routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
+  routeHint: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
   chip: {
     height: 34,
     borderRadius: radius.pill,

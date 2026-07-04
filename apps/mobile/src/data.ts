@@ -11,6 +11,7 @@ export const urls = {
   pois: `${DATA_BASE}/osm-pois.geojson`,
   facilities: `${DATA_BASE}/crt-facilities.geojson`,
   locks: `${DATA_BASE}/locks.geojson`,
+  graph: `${DATA_BASE}/graph.json`,
   moorings: `${DATA_BASE}/moorings.geojson`,
   notices: `${CDN}/data/latest/notices.json`,
 } as const
