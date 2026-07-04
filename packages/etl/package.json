@@ -1,0 +1,13 @@
+{
+  "name": "@moorhen/etl",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Data pipelines: fetch open data, validate, publish versioned artifacts",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@moorhen/schema": "workspace:*"
+  }
+}
