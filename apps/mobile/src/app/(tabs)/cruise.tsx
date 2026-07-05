@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MooringCaptureSheet, type MooringCapture } from '../../components/mooring-capture-sheet'
+import { shareMooring } from '../../lib/community'
 import { cruiseStore } from '../../lib/cruise-store'
 import { saveMooring } from '../../lib/moorings-store'
 import { useCruise } from '../../lib/use-cruise'
@@ -20,6 +21,7 @@ export default function CruiseScreen() {
 
   const onSaveMooring = (capture: MooringCapture) => {
     saveMooring(capture)
+    if (capture.share) shareMooring(capture).catch(() => {}) // best-effort
     cruiseStore.dismissMooredPrompt()
   }
 

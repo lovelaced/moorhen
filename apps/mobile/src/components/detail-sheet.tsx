@@ -1,6 +1,14 @@
 import Feather from '@expo/vector-icons/Feather'
+import { useEffect, useState } from 'react'
 import * as Linking from 'expo-linking'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  communityConfigured,
+  fetchFacilityReports,
+  submitStatusReport,
+  type CommunityReport,
+  type FacilityStatus,
+} from '../lib/community'
 import { day, font, radius, shadow } from '../theme'
 
 /**
@@ -16,6 +24,8 @@ export interface SelectedFeature {
   coords: [number, number]
   /** Optional primary link (e.g. the CRT notice page) shown beside Street View. */
   link?: { label: string; url: string }
+  /** Stable id enabling community status reports on this facility. */
+  facilityId?: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -86,6 +96,7 @@ export function selectFacility(feature: GeoJSON.Feature): SelectedFeature {
     subtitle: 'Boater facility · Canal & River Trust',
     details: services.length > 0 ? [services.join(' · ')] : [],
     coords: pointOf(feature),
+    facilityId: (props['id'] as string) || undefined,
   }
 }
 
@@ -133,6 +144,66 @@ export function selectNotice(feature: GeoJSON.Feature): SelectedFeature {
   }
 }
 
+function timeAgo(iso: string): string {
+  const minutes = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 60_000))
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `${hours} h ago`
+  return `${Math.round(hours / 24)} days ago`
+}
+
+function CommunityStatus({ facilityId, coords }: { facilityId: string; coords: [number, number] }) {
+  const [reports, setReports] = useState<CommunityReport[]>([])
+  const [sent, setSent] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchFacilityReports(facilityId).then((found) => {
+      if (!cancelled) setReports(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [facilityId])
+
+  if (!communityConfigured()) return null
+
+  const report = async (status: FacilityStatus) => {
+    try {
+      await submitStatusReport(facilityId, status, coords)
+      setSent(true)
+      setReports(await fetchFacilityReports(facilityId))
+    } catch {
+      // stay quiet — community layer is best-effort
+    }
+  }
+
+  return (
+    <View style={styles.community}>
+      {reports[0] && (
+        <Text style={styles.communityLatest}>
+          {reports[0].status === 'working' ? '✓' : '⚠'} Reported {reports[0].status}{' '}
+          {timeAgo(reports[0].created_at)}
+        </Text>
+      )}
+      {sent ? (
+        <Text style={styles.communityThanks}>Thanks — logged for other boaters</Text>
+      ) : (
+        <View style={styles.communityRow}>
+          <Pressable style={styles.communityButton} onPress={() => report('working')}>
+            <Feather name="check" size={14} color={day.greenDark} />
+            <Text style={styles.communityButtonText}>Working</Text>
+          </Pressable>
+          <Pressable style={styles.communityButton} onPress={() => report('broken')}>
+            <Feather name="alert-triangle" size={14} color={day.shieldRed} />
+            <Text style={styles.communityButtonText}>Problem</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  )
+}
+
 export function DetailSheet({
   selected,
   onClose,
@@ -157,6 +228,9 @@ export function DetailSheet({
           {line}
         </Text>
       ))}
+      {selected.facilityId && (
+        <CommunityStatus facilityId={selected.facilityId} coords={selected.coords} />
+      )}
       <View style={styles.buttons}>
         {selected.link ? (
           <Pressable
@@ -188,6 +262,20 @@ export function DetailSheet({
 }
 
 const styles = StyleSheet.create({
+  community: { gap: 6, marginTop: 2 },
+  communityLatest: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
+  communityThanks: { fontFamily: font.medium, fontSize: 12, color: day.greenDark },
+  communityRow: { flexDirection: 'row', gap: 8 },
+  communityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: day.surfaceMuted,
+  },
+  communityButtonText: { fontFamily: font.semibold, fontSize: 12, color: day.ink },
   sheet: {
     position: 'absolute',
     left: 12,

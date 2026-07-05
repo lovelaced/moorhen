@@ -102,3 +102,15 @@ Dev CDN URLs (Northamptonshire data until the GB nightly runs):
 - `…r2.dev/data/dev/basemap.pmtiles` (46 MB, range requests OK)
 - `…r2.dev/data/dev/overlay.pmtiles`, `waterways.geojson`, `graph.json`, `osm-pois.geojson`, `manifest.json`
 - Worker will write live `data/latest/notices.json` every 15 min
+
+## Supabase (community layer — Phase 4)
+
+Schema + RLS live in `supabase/migrations/`, fully validated locally by
+`./scripts/test-supabase-local.sh` (no Docker needed). To go live, follow
+`supabase/README.md`: create the free project, enable anonymous sign-ins,
+apply the migration, then set in `apps/mobile/.env`:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` (the public anon key — safe in the app)
+
+Until those are set, the app hides all community features.

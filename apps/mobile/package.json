@@ -10,6 +10,7 @@
     "@moorhen/graph": "workspace:*",
     "@moorhen/schema": "workspace:*",
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "@supabase/supabase-js": "^2.110.0",
     "expo": "~57.0.2",
     "expo-constants": "~57.0.3",
     "expo-device": "~57.0.0",

@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "registry:check": "node scripts/check-registry.mjs",
     "etl:build": "tsx packages/etl/src/bin/build.ts",
-    "typecheck:mobile": "tsc --noEmit -p apps/mobile"
+    "typecheck:mobile": "tsc --noEmit -p apps/mobile",
+    "test:supabase": "./scripts/test-supabase-local.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

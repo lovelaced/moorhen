@@ -2,7 +2,8 @@ import Feather from '@expo/vector-icons/Feather'
 import * as ImagePicker from 'expo-image-picker'
 import * as Network from 'expo-network'
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import { communityConfigured } from '../lib/community'
 import { night, font, radius } from '../theme'
 
 /**
@@ -20,6 +21,8 @@ export interface MooringCapture {
   photoUri: string | null
   speed: SpeedResult | null
   savedAtMs: number
+  /** User opted to publish this spot (location + edge + signal, never the photo's EXIF). */
+  share: boolean
 }
 
 interface SpeedResult {
@@ -63,6 +66,7 @@ export function MooringCaptureSheet({
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [speed, setSpeed] = useState<SpeedResult | null>(null)
   const [testing, setTesting] = useState(false)
+  const [share, setShare] = useState(false)
 
   const test = useCallback(async () => {
     setTesting(true)
@@ -137,9 +141,19 @@ export function MooringCaptureSheet({
         </Pressable>
       </View>
 
+      {communityConfigured() && (
+        <View style={styles.shareRow}>
+          <View style={styles.shareText}>
+            <Text style={styles.shareTitle}>Share with other boaters</Text>
+            <Text style={styles.shareMeta}>Spot, edge type and signal — never your identity</Text>
+          </View>
+          <Switch value={share} onValueChange={setShare} trackColor={{ true: '#2E6B45' }} />
+        </View>
+      )}
+
       <Pressable
         style={styles.save}
-        onPress={() => onSave({ point, edgeType, photoUri, speed, savedAtMs: Date.now() })}
+        onPress={() => onSave({ point, edgeType, photoUri, speed, savedAtMs: Date.now(), share })}
       >
         <Feather name="anchor" size={16} color="#FFFFFF" />
         <Text style={styles.saveText}>Save mooring</Text>
@@ -195,6 +209,10 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: font.semibold, fontSize: 12, color: night.ink, textAlign: 'center' },
   actionMeta: { fontFamily: font.regular, fontSize: 11, color: night.ink2 },
   thumb: { width: 28, height: 28, borderRadius: 6 },
+  shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
+  shareText: { flex: 1, gap: 1 },
+  shareTitle: { fontFamily: font.medium, fontSize: 13, color: night.ink },
+  shareMeta: { fontFamily: font.regular, fontSize: 11, color: night.ink2 },
   save: {
     marginTop: 4,
     height: 48,
