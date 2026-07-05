@@ -47,12 +47,15 @@ jobs:
       - name: Build artifacts (incl. corridor + overlay tiles)
         run: pnpm etl:build --pbf gb.osm.pbf --out artifacts --tiles
 
-      - name: Extract corridor basemap from Protomaps daily build
+      - name: Extract regional basemaps from Protomaps daily build
         run: |
           BUILD=$(date -u -d "yesterday" +%Y%m%d)
-          pmtiles extract "https://build.protomaps.com/${BUILD}.pmtiles" \
-            artifacts/basemap.pmtiles --region=artifacts/corridor.geojson --maxzoom=14
-          ls -la artifacts/basemap.pmtiles
+          for region in artifacts/region-*.geojson; do
+            id=$(basename "$region" .geojson | sed 's/^region-//')
+            pmtiles extract "https://build.protomaps.com/${BUILD}.pmtiles" \
+              "artifacts/basemap-${id}.pmtiles" --region="$region" --maxzoom=14
+          done
+          ls -la artifacts/basemap-*.pmtiles
 
       - name: Drift check vs last manifest
         run: |
