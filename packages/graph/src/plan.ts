@@ -196,10 +196,9 @@ export function planJourney(
   const route = shortestRoute(augmented, VIRTUAL_START, VIRTUAL_END)
   if (!route || route.legs.length === 0) return null
 
-  // Legs touching the virtual vertices are stored outward-from-snap; flip
-  // the final leg so its geometry flows towards the destination.
-  const legs = route.legs.map((leg) => ({ edge: leg.edge, forward: leg.forward }))
-  const last = legs[legs.length - 1]!
-  if (last.edge.a === VIRTUAL_END) last.forward = !last.forward
-  return summarize(legs, profile)
+  // Partial-edge geometry is stored outward-from-snap (virtual vertex = a),
+  // which matches the router's a→b forward semantics exactly — legs come
+  // back in travel order and orientation. (A "helpful" flip of the final leg
+  // here once bolted a 6 km backtrack onto any route ending mid-edge.)
+  return summarize(route.legs, profile)
 }

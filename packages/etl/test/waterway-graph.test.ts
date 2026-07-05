@@ -199,3 +199,31 @@ describe('offline regions', () => {
     expect(regionOf([-8, 55])).toBeNull()
   })
 })
+
+describe('planJourney line geometry', () => {
+  it('is continuous, matches distanceM, and ends at the snapped destination', async () => {
+    const { planJourney, haversineMeters, snapToNetwork } = await import('@moorhen/graph')
+    // destination mid-way along the long collapsed GU edge east of Braunston
+    const from: [number, number] = [-1.24, 52.277]
+    const to: [number, number] = [-1.16, 52.288]
+    const journey = planJourney(graph, from, to)!
+    expect(journey).not.toBeNull()
+
+    let lineLen = 0
+    for (let i = 1; i < journey.line.length; i++) {
+      lineLen += haversineMeters(journey.line[i - 1]!, journey.line[i]!)
+    }
+    // concatenated geometry length ≈ summed edge lengths — a mis-oriented leg
+    // (the bug this pins) inflates the line with a backtrack. NB single
+    // segments can legitimately be km-long (Braunston tunnel is one straight
+    // 1.9 km segment), so a max-step assertion would be wrong here.
+    expect(Math.abs(lineLen - journey.distanceM) / journey.distanceM).toBeLessThan(0.02)
+    // the line ends where the destination snapped, not at some edge vertex
+    const snap = snapToNetwork(graph, to)!
+    const end = journey.line[journey.line.length - 1]!
+    expect(haversineMeters(end, snap.point)).toBeLessThan(30)
+    // and starts at the origin snap
+    const startSnap = snapToNetwork(graph, from)!
+    expect(haversineMeters(journey.line[0]!, startSnap.point)).toBeLessThan(30)
+  })
+})

@@ -10,6 +10,7 @@ import type { OplData, OplNode, OplWay } from './osm/opl'
  */
 
 export type PoiCategory =
+  | 'junction'
   | 'lock-gate'
   | 'water-point'
   | 'elsan'
@@ -29,6 +30,8 @@ export interface Poi {
   point: [number, number]
   /** Crow-flies metres to the nearest waterway — the "how far a walk" signal. */
   walkM: number
+  /** Name of the nearest waterway — disambiguates search results. */
+  waterway?: string
   /** Pubs only: metres to the nearest known mooring, when within ~400 m. */
   mooringM?: number
   /** Pubs only: the pub's own OSM mooring tag (yes / customer / private…). */
@@ -47,6 +50,7 @@ const SHOP_TYPES = new Set([
 ])
 
 function categorize(tags: Record<string, string>): PoiCategory | null {
+  if (tags['waterway'] === 'junction' && tags['name']) return 'junction'
   if (tags['railway'] === 'station' || tags['railway'] === 'halt') return 'station'
   switch (tags['waterway']) {
     case 'lock_gate':
@@ -99,6 +103,8 @@ export interface ExtractPoisOptions {
   maxWalkM?: number
   /** Mooring-geometry index; pubs within 400 m get a mooringM distance. */
   moorings?: NetworkIndex
+  /** Labelled waterway index; POIs get the nearest waterway's name. */
+  waterwayNames?: LabelledIndex
 }
 
 /**
@@ -124,6 +130,57 @@ export function buildNetworkIndex(
     }
   }
   return { cells, cellDeg }
+}
+
+export interface LabelledIndex {
+  cells: Map<string, Array<[number, number, string]>>
+  cellDeg: number
+}
+
+/** Like buildNetworkIndex, but each point carries a label (the edge name). */
+export function buildLabelledIndex(
+  entries: Iterable<{ geometry: readonly LonLat[]; name: string | null }>,
+  cellDeg = 0.03,
+): LabelledIndex {
+  const cells = new Map<string, Array<[number, number, string]>>()
+  for (const entry of entries) {
+    if (!entry.name) continue
+    for (const point of entry.geometry) {
+      const key = cellKey(point, cellDeg)
+      const labelled: [number, number, string] = [point[0], point[1], entry.name]
+      const bucket = cells.get(key)
+      if (bucket) bucket.push(labelled)
+      else cells.set(key, [labelled])
+    }
+  }
+  return { cells, cellDeg }
+}
+
+export function nearestLabel(
+  index: LabelledIndex,
+  point: readonly [number, number],
+): string | null {
+  const cx = Math.floor(point[0] / index.cellDeg)
+  const cy = Math.floor(point[1] / index.cellDeg)
+  let best: string | null = null
+  let bestD = Infinity
+  const cosLat = Math.cos((point[1] * Math.PI) / 180)
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const bucket = index.cells.get(`${cx + dx},${cy + dy}`)
+      if (!bucket) continue
+      for (const [lon, lat, label] of bucket) {
+        const dLat = (lat - point[1]) * EARTH_M_PER_DEG_LAT
+        const dLon = (lon - point[0]) * EARTH_M_PER_DEG_LAT * cosLat
+        const d = dLat * dLat + dLon * dLon
+        if (d < bestD) {
+          bestD = d
+          best = label
+        }
+      }
+    }
+  }
+  return best
 }
 
 const EARTH_M_PER_DEG_LAT = 111_320
@@ -196,9 +253,27 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
     return extras
   }
 
+  // Canal junction guard: junction nodes must lie ON a waterway way,
+  // otherwise every named road junction near the cut would leak in.
+  const waterwayNodeIds = new Set<number>()
+  for (const way of data.ways) {
+    if (way.tags['waterway']) {
+      for (const ref of way.nodeRefs) waterwayNodeIds.add(ref)
+    }
+  }
+
+  const waterwayOf = (point: [number, number]): Pick<Poi, 'waterway'> => {
+    if (!options.waterwayNames) return {}
+    const name = nearestLabel(options.waterwayNames, point)
+    return name ? { waterway: name } : {}
+  }
+
   const pois: Poi[] = []
   for (const node of data.nodes.values()) {
-    const category = categorize(node.tags)
+    let category = categorize(node.tags)
+    if (!category && node.tags['junction'] === 'yes' && node.tags['name']) {
+      if (waterwayNodeIds.has(node.id)) category = 'junction'
+    }
     if (!category) continue
     const point: [number, number] = [node.lon, node.lat]
     const walkM = walkOf(point)
@@ -209,6 +284,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       name: node.tags['name'] ?? null,
       point,
       walkM,
+      ...waterwayOf(point),
       ...pubExtras(category, node.tags, point),
       source: 'osm',
     })
@@ -226,6 +302,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       name: way.tags['name'] ?? null,
       point,
       walkM,
+      ...waterwayOf(point),
       ...pubExtras(category, way.tags, point),
       source: 'osm',
     })

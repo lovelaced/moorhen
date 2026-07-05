@@ -24,10 +24,13 @@ import { day, font, radius } from '../theme'
 export interface SearchEntry {
   name: string
   kind: string
+  /** Nearest waterway name — disambiguates the eight Anchor Inns. */
+  waterway?: string
   point: [number, number]
 }
 
 const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Junction: 'source-branch',
   Lock: 'chevron-double-up',
   Pub: 'glass-mug-variant',
   Shop: 'storefront',
@@ -40,6 +43,8 @@ const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> =
 }
 
 const POI_KINDS: Record<string, string> = {
+  junction: 'Junction',
+  'winding-hole': 'Winding hole',
   pub: 'Pub',
   shop: 'Shop',
   station: 'Railway station',
@@ -71,9 +76,11 @@ function loadIndex(): Promise<SearchEntry[]> {
       if (!name) continue
       const kind = POI_KINDS[String(f.properties?.['category'])]
       if (!kind) continue
+      const waterway = f.properties?.['waterway'] as string | undefined
       entries.push({
         name,
         kind,
+        ...(waterway ? { waterway } : {}),
         point: (f.geometry as GeoJSON.Point).coordinates as [number, number],
       })
     }
@@ -165,7 +172,10 @@ export function SearchModal({
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowName}>{item.name}</Text>
-                <Text style={styles.rowKind}>{item.kind}</Text>
+                <Text style={styles.rowKind}>
+                  {item.kind}
+                  {item.waterway ? ` · ${item.waterway}` : ''}
+                </Text>
               </View>
             </Pressable>
           )}
