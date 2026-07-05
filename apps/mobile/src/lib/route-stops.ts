@@ -95,6 +95,13 @@ export async function findRouteStops(
     })
   }
 
+  for (const feature of facilities.features) {
+    const props = feature.properties ?? {}
+    const point = midpointOf(feature.geometry)
+    if (!point) continue
+    consider(point, (props['name'] as string) || 'CRT facility', 'CRT facility', 'facility')
+  }
+
   for (const feature of pois.features) {
     const props = feature.properties ?? {}
     const stopKind = POI_STOPS[String(props['category'])]
@@ -106,13 +113,6 @@ export async function findRouteStops(
     consider(point, (props['name'] as string) || stopKind.label, stopKind.label, stopKind.icon)
   }
 
-  for (const feature of facilities.features) {
-    const props = feature.properties ?? {}
-    const point = midpointOf(feature.geometry)
-    if (!point) continue
-    consider(point, (props['name'] as string) || 'CRT facility', 'CRT facility', 'facility')
-  }
-
   for (const feature of moorings.features) {
     const props = feature.properties ?? {}
     if (props['access'] !== 'public') continue
@@ -122,5 +122,38 @@ export async function findRouteStops(
   }
 
   stops.sort((a, b) => a.chainageM - b.chainageM)
-  return stops
+  return dedupeStops(stops)
+}
+
+const normalizeName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+function pointDistanceM(a: readonly [number, number], b: readonly [number, number]): number {
+  const dLat = (a[1] - b[1]) * 111_320
+  const dLon = (a[0] - b[0]) * 111_320 * Math.cos((a[1] * Math.PI) / 180)
+  return Math.hypot(dLat, dLon)
+}
+
+/**
+ * Cross-source dedupe: a CRT water point and its OSM twin are one stop.
+ * Same spot (<40 m) in the same category is a duplicate; so is the same
+ * name within 200 m. First occurrence wins — CRT facilities are pushed
+ * first because their records are richer.
+ */
+function dedupeStops(stops: RouteStop[]): RouteStop[] {
+  const kept: RouteStop[] = []
+  for (const stop of stops) {
+    const name = normalizeName(stop.name)
+    const duplicate = kept.some((existing) => {
+      if (Math.abs(existing.chainageM - stop.chainageM) > 250) return false
+      const distance = pointDistanceM(existing.point, stop.point)
+      if (existing.category === stop.category && distance < 40) return true
+      return name.length > 0 && normalizeName(existing.name) === name && distance < 200
+    })
+    if (!duplicate) kept.push(stop)
+  }
+  return kept
 }

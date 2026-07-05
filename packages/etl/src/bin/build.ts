@@ -17,7 +17,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildWaterwayGraph } from '@moorhen/graph'
-import { fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities'
+import { dedupeFacilities, fetchAllFacilities, CRT_FACILITY_SERVICES } from '../crt/facilities'
 import { fetchNotices } from '../crt/notices'
 import { conflatePoints } from '../conflate'
 import { filterWaterwaysToOpl, loadOpl } from '../osm/pipeline'
@@ -191,6 +191,7 @@ async function main(): Promise<void> {
     // 2. CRT facilities (all legacy layers, master layer normalized)
     console.log('[crt] fetching facility layers…')
     const master = await fetchAllFacilities('Customer_Service_Facilities_View_Public')
+    master.facilities = dedupeFacilities(master.facilities)
     if (master.errors.length > 0) {
       console.warn(
         `[crt] ${master.errors.length} facility parse warnings (first: ${master.errors[0]})`,

@@ -77,3 +77,41 @@ export async function fetchAllFacilities(
 
   return { facilities, errors, pages }
 }
+
+/**
+ * The legacy layers carry duplicate records (same site exported twice, or
+ * once per service view). Merge facilities sharing a normalized name within
+ * `maxDistanceM`, OR-ing their service flags so nothing is lost.
+ */
+export function dedupeFacilities(facilities: Facility[], maxDistanceM = 150): Facility[] {
+  const normalize = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  const kept: Facility[] = []
+  const byName = new Map<string, Facility[]>()
+
+  for (const facility of facilities) {
+    const key = normalize(facility.name)
+    const group = byName.get(key) ?? []
+    const twin = group.find((candidate) => {
+      const dLat = (candidate.point[1] - facility.point[1]) * 111_320
+      const dLon =
+        (candidate.point[0] - facility.point[0]) *
+        111_320 *
+        Math.cos((facility.point[1] * Math.PI) / 180)
+      return Math.hypot(dLat, dLon) <= maxDistanceM
+    })
+    if (twin) {
+      for (const service of Object.keys(twin.services) as Array<keyof typeof twin.services>) {
+        twin.services[service] = twin.services[service] || facility.services[service]
+      }
+      continue
+    }
+    group.push(facility)
+    byName.set(key, group)
+    kept.push(facility)
+  }
+  return kept
+}

@@ -77,3 +77,66 @@ describe('fetchAllFacilities paging', () => {
     await expect(fetchAllFacilities('Elsan_View_Public', stub)).rejects.toThrow(/HTTP 503/)
   })
 })
+
+describe('dedupeFacilities', () => {
+  const base = {
+    services: {
+      water: false,
+      elsan: false,
+      pumpOutUserOperated: false,
+      pumpOutStaffOperated: false,
+      toilet: false,
+      shower: false,
+      washingMachine: false,
+      tumbleDryer: false,
+      refuse: false,
+      recycling: false,
+      lighting: false,
+    },
+  }
+
+  it('merges same-name neighbours and ORs their services', async () => {
+    const { dedupeFacilities } = await import('../src/crt/facilities')
+    const a = {
+      ...structuredClone(base),
+      id: 'A-1',
+      name: 'Water Point, Saltisford Arm',
+      point: [-1.59, 52.285] as [number, number],
+    }
+    a.services.water = true
+    const b = {
+      ...structuredClone(base),
+      id: 'A-2',
+      name: 'Water Point, Saltisford Arm',
+      point: [-1.5901, 52.2851] as [number, number],
+    }
+    b.services.refuse = true
+    const far = {
+      ...structuredClone(base),
+      id: 'B-1',
+      name: 'Water Point, Saltisford Arm',
+      point: [-1.7, 52.4] as [number, number],
+    }
+    const result = dedupeFacilities([a, b, far])
+    expect(result).toHaveLength(2)
+    expect(result[0]!.services.water).toBe(true)
+    expect(result[0]!.services.refuse).toBe(true) // merged from the twin
+  })
+
+  it('keeps distinct names apart even when close', async () => {
+    const { dedupeFacilities } = await import('../src/crt/facilities')
+    const a = {
+      ...structuredClone(base),
+      id: 'A',
+      name: 'Elsan, Bridge 1',
+      point: [-1.59, 52.285] as [number, number],
+    }
+    const b = {
+      ...structuredClone(base),
+      id: 'B',
+      name: 'Rubbish Disposal, Br 1',
+      point: [-1.59, 52.2851] as [number, number],
+    }
+    expect(dedupeFacilities([a, b])).toHaveLength(2)
+  })
+})

@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { RouteStop } from '../lib/route-stops'
 import { day, font, radius, shadow } from '../theme'
 
@@ -30,6 +31,19 @@ export function RouteStopsSheet({
   onSelect: (stop: RouteStop) => void
   onClose: () => void
 }) {
+  const [filter, setFilter] = useState<string | null>(null)
+
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const stop of stops) counts.set(stop.category, (counts.get(stop.category) ?? 0) + 1)
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+  }, [stops])
+
+  const visible = useMemo(
+    () => (filter ? stops.filter((stop) => stop.category === filter) : stops),
+    [stops, filter],
+  )
+
   return (
     <View style={[styles.sheet, shadow.card]}>
       <View style={styles.header}>
@@ -38,9 +52,35 @@ export function RouteStopsSheet({
           <Feather name="x" size={20} color={day.ink3} />
         </Pressable>
       </View>
-      <Text style={styles.subtitle}>{stops.length} stops within a 10 min walk of the water</Text>
+      <Text style={styles.subtitle}>
+        {visible.length} stop{visible.length === 1 ? '' : 's'} within a 10 min walk of the water
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterRow}
+        contentContainerStyle={styles.filterContent}
+      >
+        <Pressable
+          onPress={() => setFilter(null)}
+          style={[styles.filterChip, filter === null && styles.filterChipActive]}
+        >
+          <Text style={[styles.filterLabel, filter === null && styles.filterLabelActive]}>All</Text>
+        </Pressable>
+        {categories.map(([category, count]) => (
+          <Pressable
+            key={category}
+            onPress={() => setFilter(filter === category ? null : category)}
+            style={[styles.filterChip, filter === category && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterLabel, filter === category && styles.filterLabelActive]}>
+              {category} · {count}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
       <FlatList
-        data={stops}
+        data={visible}
         keyExtractor={(stop, i) => `${stop.name}-${i}`}
         style={styles.list}
         renderItem={({ item }) => (
@@ -80,6 +120,18 @@ const styles = StyleSheet.create({
   title: { fontFamily: font.semibold, fontSize: 17, color: day.ink, letterSpacing: -0.2 },
   subtitle: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   list: { marginTop: 6 },
+  filterRow: { flexGrow: 0, marginTop: 4 },
+  filterContent: { gap: 6, paddingRight: 8 },
+  filterChip: {
+    height: 30,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    backgroundColor: day.surfaceMuted,
+  },
+  filterChipActive: { backgroundColor: day.green },
+  filterLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
+  filterLabelActive: { color: day.surface, fontFamily: font.semibold },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   rowIcon: {
     width: 32,
