@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import * as Linking from 'expo-linking'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -38,7 +39,7 @@ export default function CruiseScreen() {
                 </Text>
               </View>
               <View style={styles.pill}>
-                <Feather name="compass" size={15} color={night.trail} />
+                <MaterialCommunityIcons name="speedometer" size={15} color={night.trail} />
                 <Text style={styles.pillText}>
                   {state.speedMph != null ? `${state.speedMph.toFixed(1)} mph` : '—'}
                 </Text>

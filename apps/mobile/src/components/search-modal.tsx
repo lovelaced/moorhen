@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
@@ -26,15 +27,16 @@ export interface SearchEntry {
   point: [number, number]
 }
 
-const KIND_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  Lock: 'chevrons-up',
-  Pub: 'coffee',
-  Shop: 'shopping-bag',
-  'Railway station': 'chevrons-right',
+const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Lock: 'chevron-double-up',
+  Pub: 'glass-mug-variant',
+  Shop: 'basket',
+  'Railway station': 'train',
   Mooring: 'anchor',
-  Laundry: 'refresh-cw',
-  'Water point': 'droplet',
-  Place: 'map-pin',
+  Laundry: 'washing-machine',
+  'Water point': 'water-pump',
+  'Winding hole': 'autorenew',
+  Place: 'map-marker',
 }
 
 const POI_KINDS: Record<string, string> = {
@@ -155,9 +157,9 @@ export function SearchModal({
           renderItem={({ item }) => (
             <Pressable style={styles.row} onPress={() => onSelect(item)}>
               <View style={styles.rowIcon}>
-                <Feather
-                  name={KIND_ICONS[item.kind] ?? 'map-pin'}
-                  size={16}
+                <MaterialCommunityIcons
+                  name={KIND_ICONS[item.kind] ?? 'map-marker'}
+                  size={17}
                   color={day.greenDark}
                 />
               </View>

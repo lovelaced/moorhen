@@ -1,4 +1,5 @@
 import {
+  DEFAULT_TIMING_PROFILE,
   formatJourneyDuration,
   planJourney,
   type LonLat,
@@ -43,15 +44,21 @@ export interface PlannedRoute {
   cruisingDays: number
 }
 
-export function planRoute(graph: WaterwayGraph, from: LonLat, to: LonLat): PlannedRoute | null {
-  const journey = planJourney(graph, from, to)
+export function planRoute(
+  graph: WaterwayGraph,
+  from: LonLat,
+  to: LonLat,
+  hoursPerDay = DEFAULT_TIMING_PROFILE.cruisingHoursPerDay,
+): PlannedRoute | null {
+  const profile = { ...DEFAULT_TIMING_PROFILE, cruisingHoursPerDay: hoursPerDay }
+  const journey = planJourney(graph, from, to, profile)
   if (!journey) return null
   return {
     line: journey.line,
     distanceM: journey.distanceM,
     narrowLocks: journey.narrowLocks,
     broadLocks: journey.broadLocks,
-    durationLabel: formatJourneyDuration(journey.totalSeconds),
+    durationLabel: formatJourneyDuration(journey.totalSeconds, profile),
     cruisingDays: journey.cruisingDays,
   }
 }

@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import type { FilterSpecification } from '@maplibre/maplibre-gl-style-spec'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Location from 'expo-location'
@@ -13,6 +14,7 @@ import {
   subscribeMoorings,
   type SavedMooring,
 } from '../../lib/moorings-store'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
 import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
 import { findRouteStops, type RouteStop } from '../../lib/route-stops'
@@ -63,6 +65,10 @@ const MARKER_IMAGES = {
   bins: require('../../assets/markers/bins.png'),
   stoppage: require('../../assets/markers/stoppage.png'),
   facility: require('../../assets/markers/facility.png'),
+  mooring: require('../../assets/markers/mooring.png'),
+  winding: require('../../assets/markers/winding.png'),
+  pumpout: require('../../assets/markers/pumpout.png'),
+  shower: require('../../assets/markers/shower.png'),
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -79,18 +85,22 @@ type ChipKey =
   | 'trains'
   | 'stoppages'
 
-const LAYER_CHIPS: Array<{ key: ChipKey; label: string; icon: keyof typeof Feather.glyphMap }> = [
+const LAYER_CHIPS: Array<{
+  key: ChipKey
+  label: string
+  icon: keyof typeof MaterialCommunityIcons.glyphMap
+}> = [
   { key: 'moorings', label: 'Moorings', icon: 'anchor' },
-  { key: 'water', label: 'Water', icon: 'droplet' },
-  { key: 'elsan', label: 'Elsan', icon: 'rotate-ccw' },
-  { key: 'pumpout', label: 'Pump-out', icon: 'arrow-up-circle' },
-  { key: 'diesel', label: 'Diesel', icon: 'zap' },
-  { key: 'pubs', label: 'Pubs', icon: 'coffee' },
-  { key: 'shops', label: 'Shops', icon: 'shopping-bag' },
-  { key: 'laundry', label: 'Laundry', icon: 'refresh-cw' },
-  { key: 'bins', label: 'Bins', icon: 'trash-2' },
-  { key: 'trains', label: 'Trains', icon: 'chevrons-right' },
-  { key: 'stoppages', label: 'Stoppages', icon: 'alert-triangle' },
+  { key: 'water', label: 'Water', icon: 'water-pump' },
+  { key: 'elsan', label: 'Elsan', icon: 'toilet' },
+  { key: 'pumpout', label: 'Pump-out', icon: 'water-sync' },
+  { key: 'diesel', label: 'Diesel', icon: 'gas-station' },
+  { key: 'pubs', label: 'Pubs', icon: 'glass-mug-variant' },
+  { key: 'shops', label: 'Shops', icon: 'basket' },
+  { key: 'laundry', label: 'Laundry', icon: 'washing-machine' },
+  { key: 'bins', label: 'Bins', icon: 'trash-can-outline' },
+  { key: 'trains', label: 'Trains', icon: 'train' },
+  { key: 'stoppages', label: 'Stoppages', icon: 'alert' },
 ]
 
 /** Which OSM POI categories each chip switches on. */
@@ -168,6 +178,24 @@ export default function MapScreen() {
   const [planning, setPlanning] = useState(false)
   const [stops, setStops] = useState<RouteStop[] | null>(null)
   const [stopsOpen, setStopsOpen] = useState(false)
+  const [hoursPerDay, setHoursPerDay] = useState(7)
+
+  useEffect(() => {
+    AsyncStorage.getItem('moorhen.pace.hoursPerDay')
+      .then((saved) => {
+        const parsed = Number(saved)
+        if (Number.isFinite(parsed) && parsed >= 3 && parsed <= 12) setHoursPerDay(parsed)
+      })
+      .catch(() => {})
+  }, [])
+
+  const adjustPace = useCallback((delta: number) => {
+    setHoursPerDay((current) => {
+      const next = Math.min(12, Math.max(3, current + delta))
+      AsyncStorage.setItem('moorhen.pace.hoursPerDay', String(next)).catch(() => {})
+      return next
+    })
+  }, [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
   useEffect(() => {
@@ -248,7 +276,7 @@ export default function MapScreen() {
       setPlanning(true)
       try {
         const graph = await loadGraph()
-        setRoute(planRoute(graph, routeStart, point))
+        setRoute(planRoute(graph, routeStart, point, hoursPerDay))
       } catch {
         setRoute(null)
       } finally {
@@ -285,7 +313,7 @@ export default function MapScreen() {
     loadGraph()
       .then((graph) => {
         if (cancelled) return
-        const planned = planRoute(graph, fromEntry.point, toEntry.point)
+        const planned = planRoute(graph, fromEntry.point, toEntry.point, hoursPerDay)
         setRoute(planned)
         if (planned) {
           const lons = [fromEntry.point[0], toEntry.point[0]]
@@ -304,7 +332,7 @@ export default function MapScreen() {
     return () => {
       cancelled = true
     }
-  }, [fromEntry, toEntry])
+  }, [fromEntry, toEntry, hoursPerDay])
 
   const clearPlanner = useCallback(() => {
     setPlannerOpen(false)
@@ -502,7 +530,31 @@ export default function MapScreen() {
                   : ['==', ['get', 'name'], '__none__']
               }
               layout={{
-                'icon-image': 'facility',
+                // the badge shows what the facility actually offers
+                'icon-image': [
+                  'case',
+                  ['==', ['get', 'elsan'], true],
+                  'elsan',
+                  [
+                    'any',
+                    ['==', ['get', 'pumpOutUserOperated'], true],
+                    ['==', ['get', 'pumpOutStaffOperated'], true],
+                  ],
+                  'pumpout',
+                  ['==', ['get', 'water'], true],
+                  'water',
+                  ['any', ['==', ['get', 'refuse'], true], ['==', ['get', 'recycling'], true]],
+                  'bins',
+                  ['==', ['get', 'shower'], true],
+                  'shower',
+                  [
+                    'any',
+                    ['==', ['get', 'washingMachine'], true],
+                    ['==', ['get', 'tumbleDryer'], true],
+                  ],
+                  'laundry',
+                  'facility',
+                ],
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.28, 14, 0.55],
                 'icon-allow-overlap': true,
               }}
@@ -557,17 +609,16 @@ export default function MapScreen() {
                 'text-halo-width': 1.4,
               }}
             />
-            {/* winding holes: where you can actually turn — bigger, ringed */}
+            {/* winding holes: where you can actually turn the boat */}
             <MapLibre.Layer
-              type="circle"
+              type="symbol"
               id="winding-holes"
               minzoom={10}
               filter={['==', ['get', 'category'], 'winding-hole']}
-              paint={{
-                'circle-color': day.surface,
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 8],
-                'circle-stroke-color': day.waterDeep,
-                'circle-stroke-width': 2.5,
+              layout={{
+                'icon-image': 'winding',
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.22, 14, 0.5],
+                'icon-allow-overlap': true,
               }}
             />
           </MapLibre.GeoJSONSource>
@@ -642,7 +693,7 @@ export default function MapScreen() {
                 id="my-mooring-icon"
                 filter={['!=', ['get', 'hasPhoto'], true]}
                 layout={{
-                  'icon-image': 'facility',
+                  'icon-image': 'mooring',
                   'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 15, 0.4],
                   'icon-allow-overlap': true,
                 }}
@@ -738,7 +789,11 @@ export default function MapScreen() {
                 onPress={() => toggleChip(chip.key)}
                 style={[styles.chip, shadow.pill, isActive && styles.chipActive]}
               >
-                <Feather name={chip.icon} size={14} color={isActive ? day.surface : day.ink2} />
+                <MaterialCommunityIcons
+                  name={chip.icon}
+                  size={15}
+                  color={isActive ? day.surface : day.ink2}
+                />
                 <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
                   {chip.label}
                 </Text>
@@ -842,6 +897,25 @@ export default function MapScreen() {
                   </Text>
                 </Pressable>
               )}
+              <View style={styles.paceRow}>
+                <Text style={styles.paceLabel}>at {hoursPerDay} h cruising per day</Text>
+                <Pressable
+                  style={styles.paceButton}
+                  hitSlop={8}
+                  disabled={hoursPerDay <= 3}
+                  onPress={() => adjustPace(-1)}
+                >
+                  <Feather name="minus" size={14} color={hoursPerDay <= 3 ? day.ink3 : day.ink} />
+                </Pressable>
+                <Pressable
+                  style={styles.paceButton}
+                  hitSlop={8}
+                  disabled={hoursPerDay >= 12}
+                  onPress={() => adjustPace(1)}
+                >
+                  <Feather name="plus" size={14} color={hoursPerDay >= 12 ? day.ink3 : day.ink} />
+                </Pressable>
+              </View>
             </View>
             <Pressable onPress={() => setRoute(null)} hitSlop={12}>
               <Feather name="x" size={18} color={day.ink3} />
@@ -948,6 +1022,16 @@ const styles = StyleSheet.create({
   routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.green, marginTop: 2 },
+  paceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  paceLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2, flex: 1 },
+  paceButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    backgroundColor: day.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   routeHint: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
   plannerCard: {
     backgroundColor: day.surface,

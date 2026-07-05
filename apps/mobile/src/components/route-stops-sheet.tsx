@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useMemo, useState } from 'react'
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { RouteStop } from '../lib/route-stops'
@@ -9,16 +10,19 @@ import { day, font, radius, shadow } from '../theme'
  * within a ~10 minute walk of the water.
  */
 
-const ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  water: 'droplet',
-  elsan: 'rotate-ccw',
-  pub: 'coffee',
-  shop: 'shopping-bag',
-  laundry: 'refresh-cw',
-  fuel: 'zap',
-  chandlery: 'anchor',
-  station: 'chevrons-right',
-  facility: 'droplet',
+const ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  water: 'water-pump',
+  elsan: 'toilet',
+  pumpout: 'water-sync',
+  bins: 'trash-can-outline',
+  shower: 'shower-head',
+  pub: 'glass-mug-variant',
+  shop: 'basket',
+  laundry: 'washing-machine',
+  fuel: 'gas-station',
+  chandlery: 'hammer-wrench',
+  station: 'train',
+  facility: 'dots-horizontal',
   mooring: 'anchor',
 }
 
@@ -86,7 +90,11 @@ export function RouteStopsSheet({
         renderItem={({ item }) => (
           <Pressable style={styles.row} onPress={() => onSelect(item)}>
             <View style={styles.rowIcon}>
-              <Feather name={ICONS[item.icon] ?? 'map-pin'} size={15} color={day.greenDark} />
+              <MaterialCommunityIcons
+                name={ICONS[item.icon] ?? 'map-marker'}
+                size={16}
+                color={day.greenDark}
+              />
             </View>
             <View style={styles.rowText}>
               <Text style={styles.rowName} numberOfLines={1}>

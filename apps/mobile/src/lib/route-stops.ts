@@ -32,6 +32,20 @@ const POI_STOPS: Record<string, { label: string; icon: string }> = {
   station: { label: 'Railway station', icon: 'station' },
 }
 
+/** A CRT facility's headline service decides its icon and label. */
+function facilityKind(props: Record<string, unknown>): { label: string; icon: string } {
+  if (props['elsan'] === true) return { label: 'Elsan', icon: 'elsan' }
+  if (props['pumpOutUserOperated'] === true || props['pumpOutStaffOperated'] === true)
+    return { label: 'Pump-out', icon: 'pumpout' }
+  if (props['water'] === true) return { label: 'Water point', icon: 'water' }
+  if (props['refuse'] === true || props['recycling'] === true)
+    return { label: 'Rubbish disposal', icon: 'bins' }
+  if (props['shower'] === true) return { label: 'Showers', icon: 'shower' }
+  if (props['washingMachine'] === true || props['tumbleDryer'] === true)
+    return { label: 'Laundry', icon: 'laundry' }
+  return { label: 'CRT facility', icon: 'facility' }
+}
+
 const CELL_DEG = 0.02
 
 function cellOf(lon: number, lat: number): string {
@@ -99,7 +113,8 @@ export async function findRouteStops(
     const props = feature.properties ?? {}
     const point = midpointOf(feature.geometry)
     if (!point) continue
-    consider(point, (props['name'] as string) || 'CRT facility', 'CRT facility', 'facility')
+    const kind = facilityKind(props)
+    consider(point, (props['name'] as string) || kind.label, kind.label, kind.icon)
   }
 
   for (const feature of pois.features) {
