@@ -264,3 +264,19 @@ describe('day breakdown lock apportioning', () => {
     expect(maxDayLocks).toBeLessThan(journey.narrowLocks + journey.broadLocks)
   })
 })
+
+describe('journeyReach', () => {
+  it('finds frontier points at the time budget and sane distances', async () => {
+    const { journeyReach } = await import('@moorhen/graph')
+    const start: [number, number] = [-1.21, 52.29] // Braunston
+    const oneHour = journeyReach(graph, start, 3600)
+    expect(oneHour.length).toBeGreaterThan(0)
+    // at ~3 mph nothing should be further than ~4 miles in an hour
+    for (const p of oneHour) {
+      expect(p.distanceM).toBeLessThan(4.2 * 1609)
+    }
+    // more time → the furthest frontier point is further away
+    const threeHours = journeyReach(graph, start, 3 * 3600)
+    expect(threeHours[0]!.distanceM).toBeGreaterThan(oneHour[0]!.distanceM)
+  })
+})

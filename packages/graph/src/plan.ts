@@ -1,6 +1,6 @@
 import { buildChainage, pointAtChainage, projectOntoChainage, type LonLat } from './chainage'
 import type { EdgeLock, WaterwayEdge, WaterwayGraph } from './builder'
-import { shortestRoute } from './route'
+import { dijkstraCosts, shortestRoute } from './route'
 import {
   DEFAULT_TIMING_PROFILE,
   edgeToTimingEdge,
@@ -276,4 +276,82 @@ export function planJourney(
   // back in travel order and orientation. (A "helpful" flip of the final leg
   // here once bolted a 6 km backtrack onto any route ending mid-edge.)
   return summarize(route.legs, profile)
+}
+
+export interface ReachPoint {
+  point: LonLat
+  /** Metres travelled from the start to this frontier point. */
+  distanceM: number
+  /** Seconds of cruising to get here (= the budget, minus slack at termini). */
+  seconds: number
+}
+
+/**
+ * How far can the boat get from `from` in `budgetSeconds` of cruising?
+ * Time-weighted Dijkstra from the snapped start; the frontier is every point
+ * where the budget runs out mid-edge, plus any terminus reached with time to
+ * spare. This is the "2 days × 7 h" planning view.
+ */
+export function journeyReach(
+  graph: WaterwayGraph,
+  from: LonLat,
+  budgetSeconds: number,
+  profile: TimingProfile = DEFAULT_TIMING_PROFILE,
+): ReachPoint[] {
+  const start = snapToNetwork(graph, from)
+  if (!start) return []
+  const augmented: WaterwayGraph = {
+    vertices: graph.vertices,
+    edges: [
+      ...graph.edges,
+      partialEdge(start, 'a', VIRTUAL_START),
+      partialEdge(start, 'b', VIRTUAL_START),
+    ],
+  }
+  const timeWeight = (edge: WaterwayEdge) =>
+    edgeTraversalSeconds(edgeToTimingEdge(edge), 1, profile)
+  const { costs, distances } = dijkstraCosts(augmented, VIRTUAL_START, timeWeight)
+
+  const frontier: ReachPoint[] = []
+  const degree = new Map<number, number>()
+  for (const edge of augmented.edges) {
+    degree.set(edge.a, (degree.get(edge.a) ?? 0) + 1)
+    degree.set(edge.b, (degree.get(edge.b) ?? 0) + 1)
+  }
+
+  for (const edge of augmented.edges) {
+    const seconds = timeWeight(edge)
+    for (const [entry, exitVertex, forward] of [
+      [edge.a, edge.b, true],
+      [edge.b, edge.a, false],
+    ] as const) {
+      const entryCost = costs.get(entry)
+      if (entryCost === undefined || entryCost > budgetSeconds) continue
+      const exitCost = costs.get(exitVertex) ?? Infinity
+      // budget dies inside this edge travelling entry→exit, and the far end
+      // isn't reached more cheaply another way
+      if (entryCost + seconds > budgetSeconds && exitCost > budgetSeconds) {
+        const fraction = seconds === 0 ? 1 : (budgetSeconds - entryCost) / seconds
+        const geometry = forward ? edge.geometry : [...edge.geometry].reverse()
+        const chain = buildChainage(geometry)
+        frontier.push({
+          point: pointAtChainage(chain, chain.totalMeters * fraction),
+          distanceM: (distances.get(entry) ?? 0) + edge.lengthM * fraction,
+          seconds: budgetSeconds,
+        })
+      }
+    }
+  }
+  // termini reached with time to spare are destinations too
+  for (const [vertex, cost] of costs) {
+    if (vertex === VIRTUAL_START || cost > budgetSeconds) continue
+    if ((degree.get(vertex) ?? 0) === 1) {
+      const edge = augmented.edges.find((e) => e.a === vertex || e.b === vertex)
+      if (!edge) continue
+      const point = edge.a === vertex ? edge.geometry[0]! : edge.geometry[edge.geometry.length - 1]!
+      frontier.push({ point, distanceM: distances.get(vertex) ?? 0, seconds: cost })
+    }
+  }
+  frontier.sort((a, b) => b.distanceM - a.distanceM)
+  return frontier
 }

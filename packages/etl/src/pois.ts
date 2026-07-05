@@ -32,6 +32,8 @@ export interface Poi {
   walkM: number
   /** Name of the nearest waterway — disambiguates search results. */
   waterway?: string
+  /** OSM opening_hours, verbatim, for places that keep hours. */
+  hours?: string
   /** Pubs only: metres to the nearest known mooring, when within ~400 m. */
   mooringM?: number
   /** Pubs only: the pub's own OSM mooring tag (yes / customer / private…). */
@@ -238,6 +240,10 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
     return d <= maxWalkM ? Math.round(d) : null
   }
   // pubs cross-referenced against the mooring layer: "can I moor there?"
+  const HOURS_CATEGORIES = new Set<PoiCategory>(['pub', 'shop', 'laundry', 'fuel', 'chandlery'])
+  const hoursOf = (category: PoiCategory, tags: Record<string, string>): Pick<Poi, 'hours'> =>
+    HOURS_CATEGORIES.has(category) && tags['opening_hours'] ? { hours: tags['opening_hours'] } : {}
+
   const pubExtras = (
     category: PoiCategory,
     tags: Record<string, string>,
@@ -285,6 +291,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       point,
       walkM,
       ...waterwayOf(point),
+      ...hoursOf(category, node.tags),
       ...pubExtras(category, node.tags, point),
       source: 'osm',
     })
@@ -303,6 +310,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       point,
       walkM,
       ...waterwayOf(point),
+      ...hoursOf(category, way.tags),
       ...pubExtras(category, way.tags, point),
       source: 'osm',
     })

@@ -176,6 +176,7 @@ async function main(): Promise<void> {
           name: poi.name,
           walkM: poi.walkM,
           ...(poi.waterway !== undefined ? { waterway: poi.waterway } : {}),
+          ...(poi.hours !== undefined ? { hours: poi.hours } : {}),
           ...(poi.mooringM !== undefined ? { mooringM: poi.mooringM } : {}),
           ...(poi.mooring !== undefined ? { mooring: poi.mooring } : {}),
           source: poi.source,

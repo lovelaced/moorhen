@@ -73,10 +73,15 @@ function distSq(a: [number, number], b: [number, number]): number {
 }
 
 /** Nearest named place to a point — how boaters name "where day 2 ends". */
-export function nearestNamed(entries: PlaceEntry[], point: [number, number]): PlaceEntry | null {
+export function nearestNamed(
+  entries: PlaceEntry[],
+  point: [number, number],
+  kinds?: ReadonlySet<string>,
+): PlaceEntry | null {
   let best: PlaceEntry | null = null
   let bestD = Infinity
   for (const entry of entries) {
+    if (kinds && !kinds.has(entry.kind)) continue
     const d = distSq(entry.point, point)
     if (d < bestD) {
       bestD = d
@@ -84,4 +89,19 @@ export function nearestNamed(entries: PlaceEntry[], point: [number, number]): Pl
     }
   }
   return best
+}
+
+/** Navigation waypoints — what a boater calls a spot on the water. */
+export const WAYPOINT_KINDS: ReadonlySet<string> = new Set(['Lock', 'Junction', 'Mooring'])
+
+const M_PER_DEG = 111_320
+
+/** Prefer a lock/junction/mooring name when one is close; else any named place. */
+export function bestFrontierName(
+  entries: PlaceEntry[],
+  point: [number, number],
+): PlaceEntry | null {
+  const waypoint = nearestNamed(entries, point, WAYPOINT_KINDS)
+  if (waypoint && Math.sqrt(distSq(waypoint.point, point)) * M_PER_DEG < 2000) return waypoint
+  return nearestNamed(entries, point)
 }

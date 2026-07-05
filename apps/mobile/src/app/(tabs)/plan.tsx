@@ -1,13 +1,24 @@
 import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import { DEFAULT_TIMING_PROFILE, type JourneyDay } from '@moorhen/graph'
+import {
+  DEFAULT_TIMING_PROFILE,
+  journeyReach,
+  type JourneyDay,
+  type ReachPoint,
+} from '@moorhen/graph'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SearchModal } from '../../components/search-modal'
-import { loadPlacesIndex, nearestNamed, type PlaceEntry } from '../../lib/places-index'
+import {
+  bestFrontierName,
+  loadPlacesIndex,
+  nearestNamed,
+  type PlaceEntry,
+} from '../../lib/places-index'
 import { plannerStore, usePlanner } from '../../lib/planner-store'
+import { loadGraph } from '../../lib/route-graph'
 import { day as dayTheme, font, radius, shadow } from '../../theme'
 
 /**
@@ -19,6 +30,9 @@ export default function PlanScreen() {
   const { from, to, route, planning, stops, hoursPerDay } = usePlanner()
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
+  const [mode, setMode] = useState<'route' | 'reach'>('route')
+  const [reachDays, setReachDays] = useState(2)
+  const [reach, setReach] = useState<ReachPoint[] | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -27,12 +41,50 @@ export default function PlanScreen() {
       .catch(() => setPlaces(null))
   }, [])
 
+  // "how far can I get?" — recompute when the inputs move
+  useEffect(() => {
+    if (mode !== 'reach' || !from) {
+      setReach(null)
+      return
+    }
+    let cancelled = false
+    loadGraph()
+      .then((graph) => {
+        if (cancelled) return
+        const budget = reachDays * hoursPerDay * 3600
+        setReach(journeyReach(graph, from.point, budget))
+      })
+      .catch(() => setReach(null))
+    return () => {
+      cancelled = true
+    }
+  }, [mode, from, reachDays, hoursPerDay])
+
   const mph = DEFAULT_TIMING_PROFILE.cruiseSpeedMps['narrow-canal'] / 0.44704
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Plan a cruise</Text>
+
+        <View style={styles.modeRow}>
+          <Pressable
+            style={[styles.modePill, mode === 'route' && styles.modePillActive]}
+            onPress={() => setMode('route')}
+          >
+            <Text style={[styles.modeText, mode === 'route' && styles.modeTextActive]}>
+              To a destination
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.modePill, mode === 'reach' && styles.modePillActive]}
+            onPress={() => setMode('reach')}
+          >
+            <Text style={[styles.modeText, mode === 'reach' && styles.modeTextActive]}>
+              How far can I get?
+            </Text>
+          </Pressable>
+        </View>
 
         <View style={[styles.card, shadow.card]}>
           <Pressable style={styles.field} onPress={() => setSearchTarget('from')}>
@@ -41,17 +93,52 @@ export default function PlanScreen() {
               {from?.name ?? 'Choose start…'}
             </Text>
           </Pressable>
-          <Pressable style={styles.field} onPress={() => setSearchTarget('to')}>
-            <View style={styles.dotEnd} />
-            <Text style={to ? styles.fieldValue : styles.fieldPlaceholder} numberOfLines={1}>
-              {to?.name ?? 'Choose destination…'}
-            </Text>
-          </Pressable>
-          <View style={styles.fieldActions}>
-            <Pressable style={styles.actionChip} onPress={() => plannerStore.swap()} hitSlop={8}>
-              <Feather name="repeat" size={14} color={dayTheme.ink2} />
-              <Text style={styles.actionChipText}>Swap</Text>
+          {mode === 'route' && (
+            <Pressable style={styles.field} onPress={() => setSearchTarget('to')}>
+              <View style={styles.dotEnd} />
+              <Text style={to ? styles.fieldValue : styles.fieldPlaceholder} numberOfLines={1}>
+                {to?.name ?? 'Choose destination…'}
+              </Text>
             </Pressable>
+          )}
+          {mode === 'reach' && (
+            <View style={styles.reachRow}>
+              <Text style={styles.reachLabel}>
+                for {reachDays} day{reachDays === 1 ? '' : 's'} × {hoursPerDay} h
+              </Text>
+              <Pressable
+                style={styles.paceButton}
+                hitSlop={8}
+                disabled={reachDays <= 1}
+                onPress={() => setReachDays((d) => Math.max(1, d - 1))}
+              >
+                <Feather
+                  name="minus"
+                  size={15}
+                  color={reachDays <= 1 ? dayTheme.ink3 : dayTheme.ink}
+                />
+              </Pressable>
+              <Pressable
+                style={styles.paceButton}
+                hitSlop={8}
+                disabled={reachDays >= 14}
+                onPress={() => setReachDays((d) => Math.min(14, d + 1))}
+              >
+                <Feather
+                  name="plus"
+                  size={15}
+                  color={reachDays >= 14 ? dayTheme.ink3 : dayTheme.ink}
+                />
+              </Pressable>
+            </View>
+          )}
+          <View style={styles.fieldActions}>
+            {mode === 'route' && (
+              <Pressable style={styles.actionChip} onPress={() => plannerStore.swap()} hitSlop={8}>
+                <Feather name="repeat" size={14} color={dayTheme.ink2} />
+                <Text style={styles.actionChipText}>Swap</Text>
+              </Pressable>
+            )}
             {(from || to) && (
               <Pressable style={styles.actionChip} onPress={() => plannerStore.clear()} hitSlop={8}>
                 <Feather name="x" size={14} color={dayTheme.ink2} />
@@ -61,14 +148,33 @@ export default function PlanScreen() {
           </View>
         </View>
 
-        {planning && (
+        {mode === 'reach' && reach && places && (
+          <>
+            <Text style={styles.sectionTitle}>Within reach</Text>
+            {dedupeReach(reach, places).map((entry) => (
+              <View key={entry.name} style={styles.dayRow}>
+                <View style={styles.dayDot}>
+                  <Feather name="flag" size={13} color={dayTheme.greenDark} />
+                </View>
+                <View style={styles.dayCol}>
+                  <Text style={styles.dayTitle}>{entry.name}</Text>
+                  <Text style={styles.dayMeta}>
+                    {entry.kind} · {(entry.distanceM / 1609.344).toFixed(1)} mi away
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        {mode === 'route' && planning && (
           <View style={[styles.card, shadow.card, styles.planningRow]}>
             <ActivityIndicator color={dayTheme.green} />
             <Text style={styles.planningText}>Planning route…</Text>
           </View>
         )}
 
-        {route && (
+        {mode === 'route' && route && (
           <>
             <View style={[styles.card, shadow.card]}>
               <View style={styles.summaryTop}>
@@ -159,7 +265,7 @@ export default function PlanScreen() {
           </Pressable>
         </View>
 
-        {!route && !planning && (
+        {mode === 'route' && !route && !planning && (
           <Text style={styles.emptyHint}>
             Pick a start and destination — locks, junctions, moorings, pubs and places are all
             searchable. The map draws the route; this screen breaks it into cruising days.
@@ -182,6 +288,26 @@ export default function PlanScreen() {
       />
     </SafeAreaView>
   )
+}
+
+/** Frontier points collapsed to one row per named place, furthest first. */
+function dedupeReach(
+  reach: ReachPoint[],
+  places: PlaceEntry[],
+): Array<{ name: string; kind: string; distanceM: number }> {
+  const seen = new Map<string, { kind: string; distanceM: number }>()
+  for (const point of reach) {
+    const near = bestFrontierName(places, point.point as [number, number])
+    if (!near) continue
+    const existing = seen.get(near.name)
+    if (existing === undefined || point.distanceM > existing.distanceM) {
+      seen.set(near.name, { kind: near.kind, distanceM: point.distanceM })
+    }
+  }
+  return [...seen.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.distanceM - a.distanceM)
+    .slice(0, 8)
 }
 
 function DayRow({
@@ -335,6 +461,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modePill: {
+    flex: 1,
+    height: 38,
+    borderRadius: radius.pill,
+    backgroundColor: dayTheme.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modePillActive: { backgroundColor: dayTheme.green },
+  modeText: { fontFamily: font.medium, fontSize: 13, color: dayTheme.ink2 },
+  modeTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
+  reachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 },
+  reachLabel: { flex: 1, fontFamily: font.medium, fontSize: 14, color: dayTheme.ink },
   emptyHint: {
     fontFamily: font.regular,
     fontSize: 13,

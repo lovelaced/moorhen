@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as Linking from 'expo-linking'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import {
   communityConfigured,
   fetchFacilityReports,
@@ -9,6 +9,7 @@ import {
   type CommunityReport,
   type FacilityStatus,
 } from '../lib/community'
+import { fetchHygieneRating, type HygieneRating } from '../lib/hygiene'
 import { day, font, radius, shadow } from '../theme'
 
 /**
@@ -26,6 +27,8 @@ export interface SelectedFeature {
   link?: { label: string; url: string }
   /** Stable id enabling community status reports on this facility. */
   facilityId?: string
+  /** Set for pubs/shops: look up the FSA food-hygiene rating live. */
+  hygieneLookup?: { name: string; point: [number, number] }
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -90,15 +93,21 @@ export function pubMooringNote(props: Record<string, unknown>): string | null {
 
 export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
-  const category = CATEGORY_LABELS[String(props['category'])] ?? 'Place'
-  const details = [walkNote(props), pubMooringNote(props)].filter(
+  const rawCategory = String(props['category'])
+  const category = CATEGORY_LABELS[rawCategory] ?? 'Place'
+  const hours = typeof props['hours'] === 'string' ? `Hours: ${props['hours']}` : null
+  const details = [walkNote(props), pubMooringNote(props), hours].filter(
     (line): line is string => line !== null,
   )
+  const coords = pointOf(feature)
+  const name = (props['name'] as string) || category
+  const wantsHygiene = (rawCategory === 'pub' || rawCategory === 'shop') && !!props['name']
   return {
-    title: (props['name'] as string) || category,
+    title: name,
     subtitle: `${category} · OpenStreetMap`,
     details,
-    coords: pointOf(feature),
+    coords,
+    ...(wantsHygiene ? { hygieneLookup: { name, point: coords } } : {}),
   }
 }
 
@@ -220,6 +229,32 @@ function CommunityStatus({ facilityId, coords }: { facilityId: string; coords: [
   )
 }
 
+function HygieneRow({ lookup }: { lookup: { name: string; point: [number, number] } }) {
+  const [rating, setRating] = useState<HygieneRating | null | 'loading'>('loading')
+  useEffect(() => {
+    let cancelled = false
+    fetchHygieneRating(lookup.name, lookup.point).then((found) => {
+      if (!cancelled) setRating(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lookup])
+  if (rating === 'loading' || rating === null) return null
+  const numeric = Number(rating.rating)
+  return (
+    <View style={styles.hygieneRow}>
+      <Feather name="check-circle" size={13} color={day.greenDark} />
+      <Text style={styles.hygieneText}>
+        Food hygiene:{' '}
+        {Number.isFinite(numeric) ? `${'★'.repeat(numeric)} ${rating.rating}/5` : rating.rating}
+        {' · '}
+        {rating.authority}
+      </Text>
+    </View>
+  )
+}
+
 export function DetailSheet({
   selected,
   onClose,
@@ -228,8 +263,14 @@ export function DetailSheet({
   onClose: () => void
 }) {
   const [lon, lat] = selected.coords
+  // slide up on mount so swapping with the places sheet reads as an exchange
+  const rise = useRef(new Animated.Value(80)).current
+  useEffect(() => {
+    rise.setValue(80)
+    Animated.timing(rise, { toValue: 0, duration: 220, useNativeDriver: true }).start()
+  }, [selected, rise])
   return (
-    <View style={[styles.sheet, shadow.card]}>
+    <Animated.View style={[styles.sheet, shadow.card, { transform: [{ translateY: rise }] }]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.title}>{selected.title}</Text>
@@ -244,6 +285,7 @@ export function DetailSheet({
           {line}
         </Text>
       ))}
+      {selected.hygieneLookup && <HygieneRow lookup={selected.hygieneLookup} />}
       {selected.facilityId && (
         <CommunityStatus facilityId={selected.facilityId} coords={selected.coords} />
       )}
@@ -273,11 +315,13 @@ export function DetailSheet({
           <Text style={styles.buttonSecondaryText}>Close</Text>
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
+  hygieneRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  hygieneText: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
   community: { gap: 6, marginTop: 2 },
   communityLatest: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
   communityThanks: { fontFamily: font.medium, fontSize: 12, color: day.greenDark },

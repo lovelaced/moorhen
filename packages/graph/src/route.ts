@@ -64,6 +64,47 @@ class MinHeap {
   }
 }
 
+/**
+ * Full Dijkstra scan from one vertex: cost to every reachable vertex plus
+ * the distance travelled along each vertex's cheapest path. Powers
+ * "how far can I get in N days" frontiers.
+ */
+export function dijkstraCosts(
+  graph: WaterwayGraph,
+  from: number,
+  weight: EdgeWeightFn = byLength,
+): { costs: Map<number, number>; distances: Map<number, number> } {
+  const adjacency = new Map<number, { edge: WaterwayEdge; forward: boolean; next: number }[]>()
+  for (const edge of graph.edges) {
+    const a = adjacency.get(edge.a)
+    if (a) a.push({ edge, forward: true, next: edge.b })
+    else adjacency.set(edge.a, [{ edge, forward: true, next: edge.b }])
+    const b = adjacency.get(edge.b)
+    if (b) b.push({ edge, forward: false, next: edge.a })
+    else adjacency.set(edge.b, [{ edge, forward: false, next: edge.a }])
+  }
+  const costs = new Map<number, number>([[from, 0]])
+  const distances = new Map<number, number>([[from, 0]])
+  const done = new Set<number>()
+  const heap = new MinHeap()
+  heap.push(from, 0)
+  while (heap.size > 0) {
+    const current = heap.pop()!
+    if (done.has(current.vertex)) continue
+    done.add(current.vertex)
+    for (const { edge, forward, next } of adjacency.get(current.vertex) ?? []) {
+      if (done.has(next)) continue
+      const cost = current.cost + weight(edge, forward)
+      if (cost < (costs.get(next) ?? Infinity)) {
+        costs.set(next, cost)
+        distances.set(next, (distances.get(current.vertex) ?? 0) + edge.lengthM)
+        heap.push(next, cost)
+      }
+    }
+  }
+  return { costs, distances }
+}
+
 export function shortestRoute(
   graph: WaterwayGraph,
   from: number,

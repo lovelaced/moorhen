@@ -5,7 +5,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Location from 'expo-location'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
 import {
@@ -296,6 +296,17 @@ export default function MapScreen() {
     if (!route) setStopsOpen(false)
   }, [route])
 
+  // the two bottom drawers swap instead of stacking: opening a detail slides
+  // the places sheet down; closing it brings the sheet back
+  const stopsSlide = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(stopsSlide, {
+      toValue: selected ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start()
+  }, [selected, stopsSlide])
+
   const clearPlanner = useCallback(() => {
     setPlannerOpen(false)
     plannerStore.clear()
@@ -314,6 +325,9 @@ export default function MapScreen() {
       subtitle: stop.category,
       details,
       coords: stop.point,
+      ...(stop.category === 'Pub' || stop.category === 'Shop'
+        ? { hygieneLookup: { name: stop.name, point: stop.point } }
+        : {}),
     })
   }, [])
 
@@ -892,11 +906,25 @@ export default function MapScreen() {
       </Pressable>
 
       {stopsOpen && stops && (
-        <RouteStopsSheet
-          stops={stops}
-          onSelect={onStopSelect}
-          onClose={() => setStopsOpen(false)}
-        />
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              transform: [
+                {
+                  translateY: stopsSlide.interpolate({ inputRange: [0, 1], outputRange: [0, 700] }),
+                },
+              ],
+            },
+          ]}
+          pointerEvents={selected ? 'none' : 'box-none'}
+        >
+          <RouteStopsSheet
+            stops={stops}
+            onSelect={onStopSelect}
+            onClose={() => setStopsOpen(false)}
+          />
+        </Animated.View>
       )}
 
       {selected && <DetailSheet selected={selected} onClose={() => setSelected(null)} />}
