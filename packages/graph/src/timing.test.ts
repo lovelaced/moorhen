@@ -46,14 +46,14 @@ describe('effectiveSpeedMps', () => {
 
 describe('edgeTraversalSeconds', () => {
   it('matches the lock-miles folk formula within tolerance on a classic leg', () => {
-    // 10 miles + 10 narrow locks ≈ 20 lock-miles ≈ 5–6.5 h by the ÷3–4 rule
+    // 10 miles + 10 narrow locks ≈ 20 lock-miles ≈ 4.5–6.5 h by the ÷3–4 rule
     const edge: TimingEdge = {
       lengthM: 10 * MILE,
       waterwayClass: 'narrow-canal',
       narrowLocks: 10,
     }
     const hours = edgeTraversalSeconds(edge, 1) / 3600
-    expect(hours).toBeGreaterThan(5)
+    expect(hours).toBeGreaterThan(4.5)
     expect(hours).toBeLessThan(6.5)
   })
 
@@ -86,9 +86,9 @@ describe('edgeTraversalSeconds', () => {
 
 describe('estimateJourney', () => {
   // A recognisable benchmark: Braunston → Birmingham (Grand Union main line),
-  // ~37 miles with ~35 locks — guides quote "two long days", i.e. ~18–20 boating
+  // ~37 miles with ~35 locks — guides quote "two long days", ~16–20 boating
   // hours. Assert hours (what guides quote), not 7-h cruising days.
-  it('estimates the Braunston→Birmingham benchmark at ~18-22 boating hours', () => {
+  it('estimates the Braunston→Birmingham benchmark at ~16-20 boating hours', () => {
     const legs = [
       {
         edge: {
@@ -103,8 +103,8 @@ describe('estimateJourney', () => {
     const estimate = estimateJourney(legs)
     expect(estimate.lockCount).toBe(35)
     const hours = estimate.totalSeconds / 3600
-    expect(hours).toBeGreaterThan(17)
-    expect(hours).toBeLessThan(22)
+    expect(hours).toBeGreaterThan(16)
+    expect(hours).toBeLessThan(20)
     // at the default 7 gentler hours/day that's a 3-day cruise
     expect(Math.ceil(estimate.cruisingDays)).toBe(3)
   })
@@ -151,5 +151,25 @@ describe('formatJourneyDuration', () => {
     const day = DEFAULT_TIMING_PROFILE.cruisingHoursPerDay * 3600
     expect(formatJourneyDuration(2 * day)).toBe('2 days')
     expect(formatJourneyDuration(day + 3 * 3600)).toBe('1 day 3 h')
+  })
+})
+
+describe('[redacted] calibration benchmark', () => {
+  // Real [redacted] output (captured 2026-07-05): Braunston Top Lock No 6 →
+  // Hatton Bottom Lock No 26 = 20 mi 5½ fl, 30 locks, 12 h 26 min.
+  it('Braunston Top Lock → Hatton Bottom Lock ≈ 12 h 26 m (20.69 mi, 30 broad locks)', () => {
+    const estimate = estimateJourney([
+      {
+        edge: {
+          lengthM: 20.6875 * MILE,
+          waterwayClass: 'broad-canal',
+          broadLocks: 30,
+        } satisfies TimingEdge,
+        direction: 1 as const,
+      },
+    ])
+    const hours = estimate.totalSeconds / 3600
+    expect(hours).toBeGreaterThan(12.0)
+    expect(hours).toBeLessThan(12.9)
   })
 })

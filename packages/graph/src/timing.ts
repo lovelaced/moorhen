@@ -61,21 +61,23 @@ export interface TimingProfile {
 const MPH = 0.44704
 
 /**
- * Defaults sanity-checked against the folk formulas boaters actually use:
- * IWA's "3 mph + 10 min a lock" and "lock-miles ÷ 3–4 per hour". Slightly
- * conservative (2.8 mph narrow-canal, 12 min locks) because real journeys
- * lose time to water points, oncoming boats at bridge holes, and swans.
+ * Defaults calibrated against real [redacted] output, which boaters trust as
+ * near spot-on. Benchmark (verified from [redacted] directly, 2026-07-05):
+ * Braunston Top Lock No 6 → Hatton Bottom Lock No 26 = 20 mi 5½ fl,
+ * 30 locks, 12 h 26 min. That solves to ~3.2 mph on broad water and
+ * ~12 min per broad lock (narrow slightly quicker on both counts).
+ * Every value stays user-tunable.
  */
 export const DEFAULT_TIMING_PROFILE: TimingProfile = {
   cruiseSpeedMps: {
-    'narrow-canal': 2.8 * MPH,
-    'broad-canal': 3.0 * MPH,
-    'commercial-waterway': 3.5 * MPH,
-    river: 3.5 * MPH,
+    'narrow-canal': 3.0 * MPH,
+    'broad-canal': 3.2 * MPH,
+    'commercial-waterway': 3.6 * MPH,
+    river: 3.6 * MPH,
     'tidal-river': 4.5 * MPH,
   },
-  minutesPerNarrowLock: 12,
-  minutesPerBroadLock: 15,
+  minutesPerNarrowLock: 10,
+  minutesPerBroadLock: 12,
   minutesPerFlightLock: 8,
   minutesPerMovableBridge: 5,
   tunnelSpeedMps: 2.5 * MPH,

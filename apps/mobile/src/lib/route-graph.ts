@@ -1,7 +1,9 @@
 import {
+  buildChainage,
   edgeToTimingEdge,
   estimateJourney,
   formatJourneyDuration,
+  projectOntoChainage,
   shortestRoute,
   type LonLat,
   type WaterwayEdge,
@@ -14,9 +16,12 @@ import { urls } from '../data'
  * once per session (~7 MB, cached in memory); Dijkstra and the timing model
  * are the same code the ETL's golden tests exercise.
  *
- * v1 snapping: routes run between the nearest end-vertices of the nearest
- * edges — worst case that's half an edge off, which reads fine at journey
- * scale. Mid-edge splitting comes with the routing polish pass.
+ * Start and end snap to the exact nearest point on the network: the nearest
+ * edge is split at the projection into partial edges joined by virtual
+ * vertices, so distances and times are measured from where you actually are,
+ * not the nearest junction. Lock/tunnel totals on split edges are
+ * apportioned by length (lock positions within an edge aren't in the data —
+ * per-lock chainage is a future artifact refinement).
  */
 
 interface GraphFile {
@@ -47,15 +52,20 @@ function fastDistanceM(a: LonLat, b: LonLat): number {
   return Math.hypot(dLat, dLon)
 }
 
-/** Nearest graph vertex to a tapped point, via a coarse edge-geometry scan. */
-export function nearestVertex(
-  graph: WaterwayGraph,
-  point: LonLat,
-): { vertexId: number; distanceM: number } | null {
+interface Snap {
+  edge: WaterwayEdge
+  /** Metres along the edge geometry (a → b). */
+  chainageM: number
+  point: LonLat
+  distanceM: number
+  segmentIndex: number
+}
+
+/** Exact nearest point on the network: coarse edge scan, then precise projection. */
+export function snapToNetwork(graph: WaterwayGraph, point: LonLat): Snap | null {
   let bestEdge: WaterwayEdge | null = null
   let bestD = Infinity
   for (const edge of graph.edges) {
-    // stride the geometry — canal vertices are dense, precision comes later
     for (let i = 0; i < edge.geometry.length; i += 4) {
       const d = fastDistanceM(edge.geometry[i]!, point)
       if (d < bestD) {
@@ -65,11 +75,49 @@ export function nearestVertex(
     }
   }
   if (!bestEdge || bestD > 5_000) return null
-  const start = bestEdge.geometry[0]!
-  const end = bestEdge.geometry[bestEdge.geometry.length - 1]!
-  const vertexId =
-    fastDistanceM(start, point) <= fastDistanceM(end, point) ? bestEdge.a : bestEdge.b
-  return { vertexId, distanceM: bestD }
+  const chain = buildChainage(bestEdge.geometry)
+  const projection = projectOntoChainage(chain, point)
+  return {
+    edge: bestEdge,
+    chainageM: projection.chainageMeters,
+    point: projection.point,
+    distanceM: projection.offsetMeters,
+    segmentIndex: projection.segmentIndex,
+  }
+}
+
+/** Geometry of the edge up to / after a snap point, oriented outward from the snap. */
+function sliceGeometry(snap: Snap, towards: 'a' | 'b'): LonLat[] {
+  const geometry = snap.edge.geometry
+  if (towards === 'a') {
+    const head = geometry.slice(0, snap.segmentIndex + 1)
+    return [snap.point, ...head.reverse()]
+  }
+  const tail = geometry.slice(snap.segmentIndex + 1)
+  return [snap.point, ...tail]
+}
+
+function partialEdge(
+  snap: Snap,
+  towards: 'a' | 'b',
+  virtualId: number,
+  idSuffix: string,
+): WaterwayEdge {
+  const total = Math.max(snap.edge.lengthM, 1)
+  const lengthM = towards === 'a' ? snap.chainageM : snap.edge.lengthM - snap.chainageM
+  const fraction = Math.min(1, Math.max(0, lengthM / total))
+  return {
+    id: `${snap.edge.id}-${idSuffix}`,
+    a: virtualId,
+    b: towards === 'a' ? snap.edge.a : snap.edge.b,
+    name: snap.edge.name,
+    navigableClass: snap.edge.navigableClass,
+    lengthM,
+    narrowLocks: Math.round(snap.edge.narrowLocks * fraction),
+    broadLocks: Math.round(snap.edge.broadLocks * fraction),
+    tunnelM: snap.edge.tunnelM * fraction,
+    geometry: sliceGeometry(snap, towards),
+  }
 }
 
 export interface PlannedRoute {
@@ -81,31 +129,78 @@ export interface PlannedRoute {
   cruisingDays: number
 }
 
-export function planRoute(graph: WaterwayGraph, from: LonLat, to: LonLat): PlannedRoute | null {
-  const start = nearestVertex(graph, from)
-  const end = nearestVertex(graph, to)
-  if (!start || !end || start.vertexId === end.vertexId) return null
-  const route = shortestRoute(graph, start.vertexId, end.vertexId)
-  if (!route || route.legs.length === 0) return null
-
+function summarize(edges: Array<{ edge: WaterwayEdge; forward: boolean }>): PlannedRoute {
   const line: LonLat[] = []
   let narrowLocks = 0
   let broadLocks = 0
-  for (const leg of route.legs) {
-    const geometry = leg.forward ? leg.edge.geometry : [...leg.edge.geometry].reverse()
+  let distanceM = 0
+  for (const { edge, forward } of edges) {
+    const geometry = forward ? edge.geometry : [...edge.geometry].reverse()
     line.push(...(line.length > 0 ? geometry.slice(1) : geometry))
-    narrowLocks += leg.edge.narrowLocks
-    broadLocks += leg.edge.broadLocks
+    narrowLocks += edge.narrowLocks
+    broadLocks += edge.broadLocks
+    distanceM += edge.lengthM
   }
   const estimate = estimateJourney(
-    route.legs.map((leg) => ({ edge: edgeToTimingEdge(leg.edge), direction: 1 as const })),
+    edges.map(({ edge }) => ({ edge: edgeToTimingEdge(edge), direction: 1 as const })),
   )
   return {
     line,
-    distanceM: route.totalLengthM,
+    distanceM,
     narrowLocks,
     broadLocks,
     durationLabel: formatJourneyDuration(estimate.totalSeconds),
     cruisingDays: estimate.cruisingDays,
   }
+}
+
+const VIRTUAL_START = -1
+const VIRTUAL_END = -2
+
+export function planRoute(graph: WaterwayGraph, from: LonLat, to: LonLat): PlannedRoute | null {
+  const start = snapToNetwork(graph, from)
+  const end = snapToNetwork(graph, to)
+  if (!start || !end) return null
+
+  // Both points on the same edge: the route is just the slice between them.
+  if (start.edge.id === end.edge.id) {
+    const [near, far] = start.chainageM <= end.chainageM ? [start, end] : [end, start]
+    const geometry = [
+      near.point,
+      ...near.edge.geometry.slice(near.segmentIndex + 1, far.segmentIndex + 1),
+      far.point,
+    ]
+    const lengthM = far.chainageM - near.chainageM
+    const fraction = lengthM / Math.max(near.edge.lengthM, 1)
+    const slice: WaterwayEdge = {
+      ...near.edge,
+      id: `${near.edge.id}-slice`,
+      lengthM,
+      narrowLocks: Math.round(near.edge.narrowLocks * fraction),
+      broadLocks: Math.round(near.edge.broadLocks * fraction),
+      tunnelM: near.edge.tunnelM * fraction,
+      geometry,
+    }
+    return summarize([{ edge: slice, forward: start.chainageM <= end.chainageM }])
+  }
+
+  const augmented: WaterwayGraph = {
+    vertices: graph.vertices,
+    edges: [
+      ...graph.edges,
+      partialEdge(start, 'a', VIRTUAL_START, 'sa'),
+      partialEdge(start, 'b', VIRTUAL_START, 'sb'),
+      partialEdge(end, 'a', VIRTUAL_END, 'ea'),
+      partialEdge(end, 'b', VIRTUAL_END, 'eb'),
+    ],
+  }
+  const route = shortestRoute(augmented, VIRTUAL_START, VIRTUAL_END)
+  if (!route || route.legs.length === 0) return null
+
+  // Legs touching the virtual vertices are stored outward-from-snap; flip
+  // the final leg so its geometry flows towards the destination.
+  const legs = route.legs.map((leg) => ({ edge: leg.edge, forward: leg.forward }))
+  const last = legs[legs.length - 1]!
+  if (last.edge.a === VIRTUAL_END) last.forward = !last.forward
+  return summarize(legs)
 }
