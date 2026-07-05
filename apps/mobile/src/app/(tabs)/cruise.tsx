@@ -2,6 +2,9 @@ import Feather from '@expo/vector-icons/Feather'
 import * as Linking from 'expo-linking'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { MooringCaptureSheet, type MooringCapture } from '../../components/mooring-capture-sheet'
+import { cruiseStore } from '../../lib/cruise-store'
+import { saveMooring } from '../../lib/moorings-store'
 import { useCruise } from '../../lib/use-cruise'
 import { font, night, radius } from '../../theme'
 
@@ -14,6 +17,11 @@ import { font, night, radius } from '../../theme'
  */
 export default function CruiseScreen() {
   const { state, start, stop } = useCruise()
+
+  const onSaveMooring = (capture: MooringCapture) => {
+    saveMooring(capture)
+    cruiseStore.dismissMooredPrompt()
+  }
 
   return (
     <View style={styles.root}>
@@ -95,7 +103,7 @@ export default function CruiseScreen() {
             <View style={styles.bottomBar}>
               <View>
                 <Text style={styles.bottomTitle}>
-                  {(state.distanceTodayM / 1609.344).toFixed(1)} mi this cruise
+                  {(state.distanceM / 1609.344).toFixed(1)} mi this cruise
                 </Text>
                 <Text style={styles.bottomMeta}>logging to your cruise diary</Text>
               </View>
@@ -103,6 +111,14 @@ export default function CruiseScreen() {
                 <Text style={styles.endText}>End cruise</Text>
               </Pressable>
             </View>
+
+            {state.mooredPrompt && (
+              <MooringCaptureSheet
+                point={state.mooredPrompt.point}
+                onSave={onSaveMooring}
+                onDismiss={() => cruiseStore.dismissMooredPrompt()}
+              />
+            )}
           </>
         ) : (
           <View style={styles.idle}>

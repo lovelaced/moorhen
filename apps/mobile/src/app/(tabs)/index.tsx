@@ -7,6 +7,12 @@ import type { NativeSyntheticEvent } from 'react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
+import {
+  loadMoorings,
+  mooringsToGeoJSON,
+  subscribeMoorings,
+  type SavedMooring,
+} from '../../lib/moorings-store'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
 import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
 import { findRouteStops, type RouteStop } from '../../lib/route-stops'
@@ -147,6 +153,7 @@ interface NoticesFile {
 export default function MapScreen() {
   const [selected, setSelected] = useState<SelectedFeature | null>(null)
   const [active, setActive] = useState<Set<ChipKey>>(new Set(['moorings', 'water']))
+  const [myMoorings, setMyMoorings] = useState<SavedMooring[]>([])
   const [stoppages, setStoppages] = useState<GeoJSON.FeatureCollection | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [plannerOpen, setPlannerOpen] = useState(false)
@@ -185,6 +192,22 @@ export default function MapScreen() {
       })
       .catch(() => setStoppages(null))
   }, [])
+
+  useEffect(() => {
+    loadMoorings()
+      .then(setMyMoorings)
+      .catch(() => setMyMoorings([]))
+    return subscribeMoorings(setMyMoorings)
+  }, [])
+
+  const myMooringsShape = useMemo(() => mooringsToGeoJSON(myMoorings), [myMoorings])
+  const mooringPhotos = useMemo(() => {
+    const images: Record<string, string> = {}
+    for (const mooring of myMoorings) {
+      if (mooring.photoUri) images[`photo-${mooring.id}`] = mooring.photoUri
+    }
+    return images
+  }, [myMoorings])
 
   const toggleChip = useCallback((key: ChipKey) => {
     setActive((current) => {
@@ -373,6 +396,7 @@ export default function MapScreen() {
           />
           <MapLibre.UserLocation />
           <MapLibre.Images images={MARKER_IMAGES} />
+          {Object.keys(mooringPhotos).length > 0 && <MapLibre.Images images={mooringPhotos} />}
 
           <MapLibre.GeoJSONSource
             id="waterways"
@@ -558,6 +582,61 @@ export default function MapScreen() {
               }}
             />
           </MapLibre.GeoJSONSource>
+
+          {myMoorings.length > 0 && (
+            <MapLibre.GeoJSONSource
+              id="my-moorings"
+              data={myMooringsShape}
+              onPress={(event: FeaturePress) => {
+                const f = event.nativeEvent.features[0]
+                if (!f) return
+                event.stopPropagation()
+                const pt = (f.geometry as GeoJSON.Point).coordinates as [number, number]
+                const props = (f.properties ?? {}) as Record<string, unknown>
+                const details: string[] = ['Your private mooring']
+                if (props['edgeType']) details.push(`Edge: ${String(props['edgeType'])}`)
+                if (props['downMbps'])
+                  details.push(`Signal: ${Number(props['downMbps']).toFixed(1)} Mbps`)
+                setSelected({
+                  title: 'Saved mooring',
+                  subtitle: 'Only visible to you',
+                  details,
+                  coords: pt,
+                })
+              }}
+            >
+              <MapLibre.Layer
+                type="circle"
+                id="my-mooring-ring"
+                paint={{
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 13],
+                  'circle-color': '#FFFFFF',
+                  'circle-stroke-color': day.shieldRed,
+                  'circle-stroke-width': 3,
+                }}
+              />
+              <MapLibre.Layer
+                type="symbol"
+                id="my-mooring-photo"
+                filter={['==', ['get', 'hasPhoto'], true]}
+                layout={{
+                  'icon-image': ['concat', 'photo-', ['get', 'id']],
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.05, 15, 0.11],
+                  'icon-allow-overlap': true,
+                }}
+              />
+              <MapLibre.Layer
+                type="symbol"
+                id="my-mooring-icon"
+                filter={['!=', ['get', 'hasPhoto'], true]}
+                layout={{
+                  'icon-image': 'facility',
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 15, 0.4],
+                  'icon-allow-overlap': true,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
 
           {routeShape && (
             <MapLibre.GeoJSONSource id="route" data={routeShape}>

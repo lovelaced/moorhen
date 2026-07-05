@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "app.moorhen"
+      "bundleIdentifier": "app.moorhen",
+      "infoPlist": {
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +22,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.moorhen"
+      "package": "app.moorhen",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -35,7 +44,16 @@
           "imageWidth": 76
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Moorhen uses your location to track your cruise along the canal, lock onto your direction of travel, and warn about stoppages ahead.",
+          "locationWhenInUsePermission": "Moorhen uses your location to show where you are on the network and plan routes from your position.",
+          "isAndroidForegroundServiceEnabled": true,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
