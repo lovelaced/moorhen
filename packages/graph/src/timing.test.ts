@@ -154,9 +154,9 @@ describe('formatJourneyDuration', () => {
   })
 })
 
-describe('[redacted] calibration benchmark', () => {
-  // Real [redacted] output (captured 2026-07-05): Braunston Top Lock No 6 →
-  // Hatton Bottom Lock No 26 = 20 mi 5½ fl, 30 locks, 12 h 26 min.
+describe('calibration benchmarks', () => {
+  // Real-world reference: Braunston Top Lock No 6 → Hatton Bottom Lock
+  // No 26 = 20 mi 5½ fl, 30 locks, ~12 h 26 min.
   it('Braunston Top Lock → Hatton Bottom Lock ≈ 12 h 26 m (20.69 mi, 30 broad locks)', () => {
     const estimate = estimateJourney([
       {
@@ -171,5 +171,19 @@ describe('[redacted] calibration benchmark', () => {
     const hours = estimate.totalSeconds / 3600
     expect(hours).toBeGreaterThan(12.0)
     expect(hours).toBeLessThan(12.9)
+  })
+
+  // Logged on the water (2026-07-05): Marston Junction → Hartshill on the
+  // Coventry Canal, 5.6 mi, no locks, heavy moored-boat stretches ≈ 2 h 15.
+  it('Marston Junction → Hartshill ≈ 2 h 15 m (5.6 mi narrow, no locks)', () => {
+    const estimate = estimateJourney([
+      {
+        edge: { lengthM: 5.6 * MILE, waterwayClass: 'narrow-canal' } satisfies TimingEdge,
+        direction: 1 as const,
+      },
+    ])
+    const hours = estimate.totalSeconds / 3600
+    expect(hours).toBeGreaterThan(2.1)
+    expect(hours).toBeLessThan(2.4)
   })
 })

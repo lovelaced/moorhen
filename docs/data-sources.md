@@ -49,7 +49,6 @@ GET https://canalrivertrust.org.uk/api/stoppage/notices
 | Winter moorings     | page + PDFs ~early Sept; watersidemooring.com has **no API — do not scrape**                                                                                                                                               |
 | Ofcom coverage      | 50 m per-operator grid behind Map Your Mobile — verify developer terms                                                                                                                                                     |
 | Street imagery      | Google Maps deep link `google.com/maps/@?api=1&map_action=pano&viewpoint=lat,lng` (free, keyless, user-initiated); Mapillary `graph.mapillary.com/images?bbox=` (CC-BY-SA, real towpath coverage); Bing Streetside is dead |
-| [redacted]           | **prohibited — see `docs/[redacted].md`** (deep links + outreach only)                                                                                                                                                      |
 
 ## Polling etiquette
 

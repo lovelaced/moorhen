@@ -1,35 +1,35 @@
 {
-  "$comment": "Machine-readable data-source licence registry. Every ETL module must declare a SOURCE_ID that exists here with ingestion=allowed. CI enforces this (scripts/check-registry.mjs). Statuses: allowed | pending (awaiting licence clarification — do not ingest) | prohibited (never ingest).",
+  "$comment": "Machine-readable data-source licence registry. Every ETL module must declare a SOURCE_ID that exists here with ingestion=allowed. CI enforces this (scripts/check-registry.mjs). Statuses: allowed | pending (awaiting licence clarification \u2014 do not ingest) | prohibited (never ingest).",
   "sources": [
     {
       "id": "crt-notices-api",
       "name": "Canal & River Trust stoppage/navigation notices API",
       "url": "https://canalrivertrust.org.uk/api/stoppage/notices",
       "licence": "Undocumented public endpoint (no published terms)",
-      "attribution": "© Canal & River Trust",
+      "attribution": "\u00a9 Canal & River Trust",
       "ingestion": "allowed",
       "cadence": "poll every 15 min, cache last-good",
-      "notes": "All five query params (consult, geometry, start, end, fields) are required or the API returns HTTP 500. geometry=line is broken server-side. No CORS — native/proxy only. Poll politely with a descriptive User-Agent. Breakage-prone: validate defensively, alert on schema drift. Outreach to CRT for a blessing is planned."
+      "notes": "All five query params (consult, geometry, start, end, fields) are required or the API returns HTTP 500. geometry=line is broken server-side. No CORS \u2014 native/proxy only. Poll politely with a descriptive User-Agent. Breakage-prone: validate defensively, alert on schema drift. Outreach to CRT for a blessing is planned."
     },
     {
       "id": "crt-opendata-ogl",
-      "name": "CRT open data — OGL v3 datasets (locks, bridges, winding holes, wharves, tunnel portals, weirs, slipways, reservoirs, boat lifts, dry docks, aqueducts, culverts)",
+      "name": "CRT open data \u2014 OGL v3 datasets (locks, bridges, winding holes, wharves, tunnel portals, weirs, slipways, reservoirs, boat lifts, dry docks, aqueducts, culverts)",
       "url": "https://data-canalrivertrust.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
       "licence": "OGL-v3",
-      "attribution": "Contains Canal & River Trust data © Canal & River Trust, licensed under the Open Government Licence v3.0",
+      "attribution": "Contains Canal & River Trust data \u00a9 Canal & River Trust, licensed under the Open Government Licence v3.0",
       "ingestion": "allowed",
       "cadence": "monthly refresh; nightly ETL pull is fine",
-      "notes": "Licence is PER DATASET — verify each item's licence via DCAT/data.gov.uk before adding it to a pipeline. FeatureServers at services.arcgis.com/DknzyjEEie5tEW0u."
+      "notes": "Licence is PER DATASET \u2014 verify each item's licence via DCAT/data.gov.uk before adding it to a pipeline. FeatureServers at services.arcgis.com/DknzyjEEie5tEW0u."
     },
     {
       "id": "crt-legacy-facilities",
-      "name": "CRT legacy 2019 facility/mooring layers (Customer_Service_Facilities, Water_Point, Elsan, Pump_Out, Refuse_Disposal, Mooring_Site, Boatyards — *_View_Public)",
+      "name": "CRT legacy 2019 facility/mooring layers (Customer_Service_Facilities, Water_Point, Elsan, Pump_Out, Refuse_Disposal, Mooring_Site, Boatyards \u2014 *_View_Public)",
       "url": "https://services.arcgis.com/DknzyjEEie5tEW0u/arcgis/rest/services/",
-      "licence": "CRT data licence (attribution required; non-commercial use only — see docs/licensing.md)",
-      "attribution": "© The Canal & River Trust copyright and database rights reserved",
+      "licence": "CRT data licence (attribution required; non-commercial use only \u2014 see docs/licensing.md)",
+      "attribution": "\u00a9 The Canal & River Trust copyright and database rights reserved",
       "ingestion": "allowed",
       "cadence": "static since Dec 2019; weekly pull to detect migration",
-      "notes": "Only source of facility/mooring point data. Page with resultOffset (transfer limit 1000-2000). The non-commercial clause is a hard constraint: the app must remain ad-free and payment-free. Open/closed status is NOT in these layers — it comes from notices typeId 10 + the community layer."
+      "notes": "Only source of facility/mooring point data. Page with resultOffset (transfer limit 1000-2000). The non-commercial clause is a hard constraint: the app must remain ad-free and payment-free. Open/closed status is NOT in these layers \u2014 it comes from notices typeId 10 + the community layer."
     },
     {
       "id": "crt-centreline",
@@ -39,17 +39,17 @@
       "attribution": "n/a",
       "ingestion": "prohibited",
       "cadence": "n/a",
-      "notes": "DO NOT SHIP. Licence record is contradictory and non-commercial. OSM waterway geometry is essentially complete for UK canals and ODbL-clean — use that instead. Revisit only with written clarification from CRT."
+      "notes": "DO NOT SHIP. Licence record is contradictory and non-commercial. OSM waterway geometry is essentially complete for UK canals and ODbL-clean \u2014 use that instead. Revisit only with written clarification from CRT."
     },
     {
       "id": "osm-geofabrik-gb",
-      "name": "OpenStreetMap — Geofabrik Great Britain extract",
+      "name": "OpenStreetMap \u2014 Geofabrik Great Britain extract",
       "url": "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf",
       "licence": "ODbL-1.0",
-      "attribution": "© OpenStreetMap contributors",
+      "attribution": "\u00a9 OpenStreetMap contributors",
       "ingestion": "allowed",
       "cadence": "nightly",
-      "notes": "Primary source for all waterway geometry, locks, bridges, pubs, shops. Keep OSM-derived tables separately provenanced (ODbL share-alike). Never use public Overpass in production paths — osmium over this extract instead."
+      "notes": "Primary source for all waterway geometry, locks, bridges, pubs, shops. Keep OSM-derived tables separately provenanced (ODbL share-alike). Never use public Overpass in production paths \u2014 osmium over this extract instead."
     },
     {
       "id": "ea-flood-monitoring",
@@ -69,14 +69,14 @@
       "attribution": "Contains public sector information licensed under the Open Government Licence v3.0",
       "ingestion": "allowed",
       "cadence": "updated daily ~11:00; poll a few times per day",
-      "notes": "Reach-by-reach board status is embedded govspeak HTML inside details.body — needs a parser; format may change without notice."
+      "notes": "Reach-by-reach board status is embedded govspeak HTML inside details.body \u2014 needs a parser; format may change without notice."
     },
     {
       "id": "fsa-fhrs",
-      "name": "Food Standards Agency — Food Hygiene Rating Scheme API + bulk XML",
+      "name": "Food Standards Agency \u2014 Food Hygiene Rating Scheme API + bulk XML",
       "url": "https://api.ratings.food.gov.uk/",
       "licence": "OGL-v3",
-      "attribution": "Contains Food Standards Agency data © Crown copyright",
+      "attribution": "Contains Food Standards Agency data \u00a9 Crown copyright",
       "ingestion": "allowed",
       "cadence": "daily bulk in ETL",
       "notes": "Requires header x-api-version: 2 and a real User-Agent. Scotland uses FHIS (Pass/Improvement Required) not numeric ratings."
@@ -96,7 +96,7 @@
       "name": "Ordnance Survey OpenData (OpenZoomstack, OpenRivers, CodePoint Open)",
       "url": "https://api.os.uk/downloads/v1/products",
       "licence": "OGL-v3",
-      "attribution": "Contains OS data © Crown copyright and database right",
+      "attribution": "Contains OS data \u00a9 Crown copyright and database right",
       "ingestion": "allowed",
       "cadence": "quarterly releases",
       "notes": "Basemap supplement / river-network fallback."
@@ -106,10 +106,10 @@
       "name": "Mapillary street-level imagery API",
       "url": "https://graph.mapillary.com/",
       "licence": "Imagery CC-BY-SA-4.0; free API (token required)",
-      "attribution": "Imagery © Mapillary contributors, CC BY-SA 4.0",
+      "attribution": "Imagery \u00a9 Mapillary contributors, CC BY-SA 4.0",
       "ingestion": "allowed",
       "cadence": "live, display-only",
-      "notes": "Display as a separate layer/work — CC-BY-SA imagery does not contaminate the ODbL database. The only source with real towpath-level imagery."
+      "notes": "Display as a separate layer/work \u2014 CC-BY-SA imagery does not contaminate the ODbL database. The only source with real towpath-level imagery."
     },
     {
       "id": "google-streetview-deeplink",
@@ -145,21 +145,11 @@
       "id": "ofcom-mobile-coverage",
       "name": "Ofcom mobile coverage API (per-operator 4G/5G, 50 m grid)",
       "url": "https://www.ofcom.org.uk/phones-and-broadband/coverage-and-speeds/mobile-coverage-checker",
-      "licence": "TBD — verify developer terms",
+      "licence": "TBD \u2014 verify developer terms",
       "attribution": "TBD",
       "ingestion": "pending",
       "cadence": "n/a",
       "notes": "Baseline for signal-at-mooring; our auto-captured community samples are the ground truth either way."
-    },
-    {
-      "id": "[redacted]",
-      "name": "[redacted] ([redacted].org.uk / [redacted].uk) — gazetteer, dimensions, route planning",
-      "url": "https://[redacted].org.uk/",
-      "licence": "Proprietary; no API or bulk export; reuse requires the maintainer's permission",
-      "attribution": "n/a",
-      "ingestion": "prohibited",
-      "cadence": "n/a",
-      "notes": "NEVER SCRAPE — under any circumstances or at any rate. (1) The maintainer actively monitors and blocks scrapers; (2) the gazetteer is protected by UK database right — bulk extraction without permission is infringement; (3) unlicensed data would contaminate our clean-provenance ODbL story. Interoperate instead: per-place deep links TO [redacted] (drives him traffic), and pursue the outreach/escrow proposal in docs/[redacted].md. Timing/planning *logic* (lock-miles etc.) is reimplemented from published descriptions — algorithms are not copyrightable; data is protected."
     }
   ]
 }

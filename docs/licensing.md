@@ -17,7 +17,6 @@ Conflation for display (e.g. a CRT water point and an OSM node shown as one map 
 - **No ads, no paid tiers, ever.** The CRT data licence §3.1.4 excludes any use "for or in connection with... any Commercial Purpose" (explicitly including selling ad space), and Open-Meteo's free tier is non-commercial. The app is donation/grant-funded.
 - **Never ship the CRT canal centreline** — its licence-of-record is contradictory (custom non-commercial vs OGL) and OSM geometry is complete and ODbL-clean.
 - **Skip INSPIRE-EUL datasets** (CRT Docks, Embankments) — personal, non-commercial, non-redistributable; incompatible with everything we do.
-- **Never scrape [redacted]** — see `docs/[redacted].md`.
 - **Never use tile.openstreetmap.org** in the app (OSMF tile policy forbids app usage patterns); we build and host our own PMTiles.
 
 ## Attribution requirements (in-app attribution screen + map credits)

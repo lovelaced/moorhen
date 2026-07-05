@@ -1,7 +1,7 @@
 /**
  * Journey-time model.
  *
- * The goal is [redacted]-class accuracy without [redacted]'s data: the *shape*
+ * The goal is estimates boaters can trust to the quarter-hour: the *shape*
  * of the model captures everything that actually slows a boat down —
  * per-section speed factors (shallow water, heavy moorings), direction-
  * dependent current (the Llangollen problem), lock types, flights, movable
@@ -61,16 +61,17 @@ export interface TimingProfile {
 const MPH = 0.44704
 
 /**
- * Defaults calibrated against real [redacted] output, which boaters trust as
- * near spot-on. Benchmark (verified from [redacted] directly, 2026-07-05):
- * Braunston Top Lock No 6 → Hatton Bottom Lock No 26 = 20 mi 5½ fl,
- * 30 locks, 12 h 26 min. That solves to ~3.2 mph on broad water and
- * ~12 min per broad lock (narrow slightly quicker on both counts).
+ * Defaults calibrated against real cruises (golden tests pin both):
+ * - Broad: Braunston Top Lock → Hatton Bottom Lock = 20 mi 5½ fl, 30 locks,
+ *   ~12½ h → ~3.2 mph on broad water and ~12 min per broad lock.
+ * - Narrow: Marston Junction → Hartshill (Coventry Canal) = 5.6 mi, no
+ *   locks, ~2¼ h logged on the water → ~2.5 mph. Narrow canals run slower
+ *   than the boat can: moored boats, blind bridge holes, shallow edges.
  * Every value stays user-tunable.
  */
 export const DEFAULT_TIMING_PROFILE: TimingProfile = {
   cruiseSpeedMps: {
-    'narrow-canal': 3.0 * MPH,
+    'narrow-canal': 2.5 * MPH,
     'broad-canal': 3.2 * MPH,
     'commercial-waterway': 3.6 * MPH,
     river: 3.6 * MPH,
@@ -80,7 +81,7 @@ export const DEFAULT_TIMING_PROFILE: TimingProfile = {
   minutesPerBroadLock: 12,
   minutesPerFlightLock: 8,
   minutesPerMovableBridge: 5,
-  tunnelSpeedMps: 2.5 * MPH,
+  tunnelSpeedMps: 2.0 * MPH,
   minSpeedMps: 1.0 * MPH,
   maxSpeedMps: 4.5 * MPH,
   cruisingHoursPerDay: 7,

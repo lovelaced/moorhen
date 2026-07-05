@@ -18,10 +18,6 @@ Canals and locks are gauge-classified (`narrow` ~7 ft vs `broad` ~14 ft) through
 - Boat profile beam → hard warnings when a route needs a narrow lock a widebeam can't fit ("your 10' 6" beam cannot pass Watford Locks").
 - Map/POI iconography should visually distinguish narrow and broad locks; route summaries say "35 locks (23 broad, 12 narrow)".
 
-## [redacted] (owner, 2026-07-04)
-
-No outreach emails yet — drafts stay in `docs/outreach/` until the owner decides the time is right (likely when Moorhen is demoable). Deep links fine; zero automated ingestion (see `docs/[redacted].md`).
-
 ## Mooring auto-detection → private coverage & mooring map (owner, 2026-07-04)
 
 When cruise tracking believes the boat has been **stationary for over an hour**, send a
