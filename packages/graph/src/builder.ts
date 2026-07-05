@@ -4,6 +4,7 @@ import {
   lockGaugeFromTags,
   NAVIGABLE_RIVERS,
   type Classification,
+  type LockGauge,
   type NavigableClass,
 } from './classification'
 
@@ -25,6 +26,12 @@ export interface SourceWay {
   tags: Record<string, string>
 }
 
+export interface EdgeLock {
+  /** Metres along the edge (a → b) at the chamber's midpoint. */
+  chainageM: number
+  gauge: LockGauge
+}
+
 export interface WaterwayEdge {
   id: string
   /** Vertex (OSM node) ids at each end. */
@@ -37,6 +44,8 @@ export interface WaterwayEdge {
   narrowLocks: number
   broadLocks: number
   tunnelM: number
+  /** Chamber positions along the edge — lets route splits count locks exactly. */
+  locks: EdgeLock[]
   /** Geometry oriented from vertex `a` to vertex `b`. */
   geometry: LonLat[]
 }
@@ -226,32 +235,39 @@ function buildEdge(
   // same way). Within a run, distinct chambers are identified by lock_name /
   // lock_ref (UK waterways convention — the way's `name` is usually just the
   // canal), falling back to the source way id. This keeps staircases honest
-  // (Watford = 7 chambers) without double-counting split chambers.
-  let narrowLocks = 0
-  let broadLocks = 0
-  let run: Segment[] = []
+  // (Watford = 7 chambers) without double-counting split chambers. Each
+  // chamber records its chainage along the edge so route splits stay exact.
+  const locks: EdgeLock[] = []
+  let run: Array<{ segment: Segment; startChainageM: number }> = []
   const flushRun = () => {
     if (run.length === 0) return
-    const chambers = new Map<string, Segment>()
-    for (const segment of run) {
+    const chambers = new Map<string, { segment: Segment; startChainageM: number }>()
+    for (const member of run) {
+      const segment = member.segment
       const key =
         segment.tags['lock_name'] ??
         segment.tags['lock_ref'] ??
         (segment.name && segment.name !== name ? segment.name : `way:${segment.wayId}`)
-      if (!chambers.has(key)) chambers.set(key, segment)
+      if (!chambers.has(key)) chambers.set(key, member)
     }
     for (const member of chambers.values()) {
-      const gauge = lockGaugeFromTags(member.tags, member.cls.lockGauge)
-      if (gauge === 'narrow') narrowLocks += 1
-      else broadLocks += 1
+      locks.push({
+        chainageM: member.startChainageM + member.segment.lengthM / 2,
+        gauge: lockGaugeFromTags(member.segment.tags, member.segment.cls.lockGauge),
+      })
     }
     run = []
   }
+  let cursorM = 0
   for (const segment of chain) {
-    if (segment.isLock) run.push(segment)
+    if (segment.isLock) run.push({ segment, startChainageM: cursorM })
     else flushRun()
+    cursorM += segment.lengthM
   }
   flushRun()
+  locks.sort((x, y) => x.chainageM - y.chainageM)
+  const narrowLocks = locks.filter((lock) => lock.gauge === 'narrow').length
+  const broadLocks = locks.length - narrowLocks
 
   // Concatenate geometry oriented a → b.
   const geometry: LonLat[] = []
@@ -270,6 +286,7 @@ function buildEdge(
     narrowLocks,
     broadLocks,
     tunnelM,
+    locks,
     geometry,
   }
 }

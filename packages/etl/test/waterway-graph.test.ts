@@ -132,3 +132,28 @@ describe('routing across the network', () => {
     expect(hours).toBeLessThan(9)
   })
 })
+
+describe('planJourney with exact per-chamber lock counting', () => {
+  it('a mid-flight start counts only the chambers actually passed', async () => {
+    const { planJourney, snapToNetwork } = await import('@moorhen/graph')
+    // Start on the Oxford Canal west of Braunston Turn, end past the tunnel
+    // on the GU — must pass the six Braunston chambers exactly.
+    const journey = planJourney(graph, [-1.24, 52.277], [-1.15, 52.29])
+    expect(journey).not.toBeNull()
+    expect(journey!.broadLocks).toBe(6)
+    expect(journey!.narrowLocks).toBe(0)
+    // sanity: snapping reports a nearby edge, not a junction miles away
+    const snap = snapToNetwork(graph, [-1.24, 52.277])
+    expect(snap!.distanceM).toBeLessThan(800)
+  })
+
+  it('edges carry per-chamber chainage consistent with their counts', () => {
+    for (const edge of graph.edges) {
+      expect(edge.locks.length).toBe(edge.narrowLocks + edge.broadLocks)
+      for (const lock of edge.locks) {
+        expect(lock.chainageM).toBeGreaterThanOrEqual(0)
+        expect(lock.chainageM).toBeLessThanOrEqual(edge.lengthM + 1)
+      }
+    }
+  })
+})

@@ -670,6 +670,21 @@ export default function MapScreen() {
                 <Text style={fromEntry ? styles.plannerValue : styles.plannerPlaceholder}>
                   {fromEntry?.name ?? 'Choose start…'}
                 </Text>
+                <Pressable
+                  hitSlop={10}
+                  onPress={async () => {
+                    const permission = await Location.requestForegroundPermissionsAsync()
+                    if (!permission.granted) return
+                    const position = await Location.getCurrentPositionAsync({})
+                    setFromEntry({
+                      name: 'My location',
+                      kind: 'Current position',
+                      point: [position.coords.longitude, position.coords.latitude],
+                    })
+                  }}
+                >
+                  <Feather name="crosshair" size={16} color={day.green} />
+                </Pressable>
               </Pressable>
               <Pressable
                 style={styles.plannerField}
