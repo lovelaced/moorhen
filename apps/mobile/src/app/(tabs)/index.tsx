@@ -20,6 +20,7 @@ import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
 import { findRouteStops, type RouteStop } from '../../lib/route-stops'
 import {
   DetailSheet,
+  pubMooringNote,
   selectFacility,
   selectLock,
   selectMooring,
@@ -73,6 +74,7 @@ const MARKER_IMAGES = {
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 type ChipKey =
+  | 'canalside'
   | 'moorings'
   | 'water'
   | 'elsan'
@@ -90,6 +92,7 @@ const LAYER_CHIPS: Array<{
   label: string
   icon: keyof typeof MaterialCommunityIcons.glyphMap
 }> = [
+  { key: 'canalside', label: 'Canalside', icon: 'map-marker-distance' },
   { key: 'moorings', label: 'Moorings', icon: 'anchor' },
   { key: 'water', label: 'Water', icon: 'faucet' },
   { key: 'elsan', label: 'Elsan', icon: 'toilet' },
@@ -124,6 +127,8 @@ const CHIP_FACILITY_SERVICES: Partial<Record<ChipKey, string[]>> = {
 
 /** ~20 minutes at towpath pace. */
 const MAX_WALK_M = 1600
+/** Right on the cut — the Canalside chip swaps to this. */
+const CANALSIDE_WALK_M = 120
 
 const POI_ICON: unknown = [
   'match',
@@ -359,12 +364,15 @@ export default function MapScreen() {
   const onStopSelect = useCallback((stop: RouteStop) => {
     setStopsOpen(false)
     cameraRef.current?.easeTo({ center: stop.point, zoom: 14.5, duration: 700 })
+    const details = [
+      `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route · ${Math.max(1, Math.round(stop.offsetM / 80))} min walk from the water`,
+    ]
+    const mooringNote = stop.pubProps ? pubMooringNote(stop.pubProps) : null
+    if (mooringNote) details.push(mooringNote)
     setSelected({
       title: stop.name,
       subtitle: stop.category,
-      details: [
-        `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route · ${Math.max(1, Math.round(stop.offsetM / 80))} min walk from the water`,
-      ],
+      details,
       coords: stop.point,
     })
   }, [])
@@ -569,7 +577,7 @@ export default function MapScreen() {
               filter={
                 [
                   'all',
-                  ['<=', ['get', 'walkM'], MAX_WALK_M],
+                  ['<=', ['get', 'walkM'], active.has('canalside') ? CANALSIDE_WALK_M : MAX_WALK_M],
                   ['in', ['get', 'category'], ['literal', activePoiCategories]],
                 ] as unknown as FilterSpecification
               }
@@ -895,7 +903,7 @@ export default function MapScreen() {
               {stops && stops.length > 0 && (
                 <Pressable onPress={() => setStopsOpen(true)}>
                   <Text style={styles.routeStopsLink}>
-                    {stops.length} places along the way — water, pubs, moorings…
+                    {stops.length} canalside places along the way — water, pubs, moorings…
                   </Text>
                 </Pressable>
               )}

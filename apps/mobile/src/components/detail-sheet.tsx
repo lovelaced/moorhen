@@ -74,14 +74,30 @@ function walkNote(props: Props): string | null {
   return `~${minutes} min walk from the cut`
 }
 
+/** Can you moor at this pub? OSM tag first, then proximity to the mooring layer. */
+export function pubMooringNote(props: Record<string, unknown>): string | null {
+  if (props['category'] !== 'pub') return null
+  const tag = props['mooring'] as string | undefined
+  if (tag === 'yes' || tag === 'customer') return 'Boat mooring at the pub'
+  if (tag === 'private' || tag === 'no') return 'No visitor mooring at the pub'
+  const mooringM = Number(props['mooringM'])
+  if (Number.isFinite(mooringM)) {
+    if (mooringM <= 100) return 'Mooring right outside'
+    return `Nearest mooring ~${Math.round(mooringM / 10) * 10} m away`
+  }
+  return 'No mooring recorded nearby'
+}
+
 export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const category = CATEGORY_LABELS[String(props['category'])] ?? 'Place'
-  const walk = walkNote(props)
+  const details = [walkNote(props), pubMooringNote(props)].filter(
+    (line): line is string => line !== null,
+  )
   return {
     title: (props['name'] as string) || category,
     subtitle: `${category} · OpenStreetMap`,
-    details: walk ? [walk] : [],
+    details,
     coords: pointOf(feature),
   }
 }

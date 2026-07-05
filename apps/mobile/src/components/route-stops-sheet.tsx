@@ -57,7 +57,7 @@ export function RouteStopsSheet({
         </Pressable>
       </View>
       <Text style={styles.subtitle}>
-        {visible.length} place{visible.length === 1 ? '' : 's'} within a 10 min walk of the water
+        {visible.length} canalside place{visible.length === 1 ? '' : 's'} along your route
       </Text>
       <ScrollView
         horizontal

@@ -3,11 +3,12 @@ import { getFacilities, getMoorings, getPois } from './artifacts'
 
 /**
  * Services along a planned route, ordered by distance along the journey.
- * Tighter than the map layers on purpose: en-route errands only earn a stop
- * if they're within a ~10 minute walk (800 m) of the water.
+ * Deliberately canalside-only: a place earns a slot en route when it's
+ * right on the cut (a pub by the bridge, a water point on the towpath) —
+ * not a fifteen-minute walk into town.
  */
 
-export const ROUTE_STOP_MAX_OFFSET_M = 800
+export const ROUTE_STOP_MAX_OFFSET_M = 120
 
 export interface RouteStop {
   name: string
@@ -19,6 +20,8 @@ export interface RouteStop {
   chainageM: number
   /** Metres off the route (crow-flies). */
   offsetM: number
+  /** Pubs: raw mooring props so the detail sheet can say if you can moor there. */
+  pubProps?: { category: 'pub'; mooring?: string; mooringM?: number }
 }
 
 const POI_STOPS: Record<string, { label: string; icon: string }> = {
@@ -95,6 +98,7 @@ export async function findRouteStops(
     name: string,
     category: string,
     icon: string,
+    pubProps?: RouteStop['pubProps'],
   ): void => {
     if (!cells.has(cellOf(point[0], point[1]))) return
     const projection = projectOntoChainage(chain, point)
@@ -106,6 +110,7 @@ export async function findRouteStops(
       point,
       chainageM: projection.chainageMeters,
       offsetM: projection.offsetMeters,
+      ...(pubProps ? { pubProps } : {}),
     })
   }
 
@@ -125,7 +130,23 @@ export async function findRouteStops(
     if (Number.isFinite(walkM) && walkM > maxOffsetM) continue
     const point = midpointOf(feature.geometry)
     if (!point) continue
-    consider(point, (props['name'] as string) || stopKind.label, stopKind.label, stopKind.icon)
+    const pubProps =
+      props['category'] === 'pub'
+        ? {
+            category: 'pub' as const,
+            ...(typeof props['mooring'] === 'string' ? { mooring: props['mooring'] } : {}),
+            ...(Number.isFinite(Number(props['mooringM']))
+              ? { mooringM: Number(props['mooringM']) }
+              : {}),
+          }
+        : undefined
+    consider(
+      point,
+      (props['name'] as string) || stopKind.label,
+      stopKind.label,
+      stopKind.icon,
+      pubProps,
+    )
   }
 
   for (const feature of moorings.features) {

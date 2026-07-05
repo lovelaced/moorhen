@@ -155,7 +155,8 @@ async function main(): Promise<void> {
   manifest['osmMoorings'] = moorings.length
 
   const network = buildNetworkIndex(graph.edges.map((e) => e.geometry))
-  const pois = extractPois(data, { network, maxWalkM: 2000 })
+  const mooringIndex = buildNetworkIndex(moorings.map((m) => m.line))
+  const pois = extractPois(data, { network, maxWalkM: 2000, moorings: mooringIndex })
   await writeFile(
     join(args.out, 'osm-pois.geojson'),
     JSON.stringify({
@@ -168,6 +169,8 @@ async function main(): Promise<void> {
           category: poi.category,
           name: poi.name,
           walkM: poi.walkM,
+          ...(poi.mooringM !== undefined ? { mooringM: poi.mooringM } : {}),
+          ...(poi.mooring !== undefined ? { mooring: poi.mooring } : {}),
           source: poi.source,
         },
       })),

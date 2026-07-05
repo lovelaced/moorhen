@@ -29,6 +29,10 @@ export interface Poi {
   point: [number, number]
   /** Crow-flies metres to the nearest waterway — the "how far a walk" signal. */
   walkM: number
+  /** Pubs only: metres to the nearest known mooring, when within ~400 m. */
+  mooringM?: number
+  /** Pubs only: the pub's own OSM mooring tag (yes / customer / private…). */
+  mooring?: string
   source: 'osm'
 }
 
@@ -93,6 +97,8 @@ export interface ExtractPoisOptions {
   network?: NetworkIndex
   /** Default 2000 m (~25 min walk) — the app filters tighter (~20 min). */
   maxWalkM?: number
+  /** Mooring-geometry index; pubs within 400 m get a mooringM distance. */
+  moorings?: NetworkIndex
 }
 
 /**
@@ -174,6 +180,21 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
     const d = distanceToNetworkM(options.network, point)
     return d <= maxWalkM ? Math.round(d) : null
   }
+  // pubs cross-referenced against the mooring layer: "can I moor there?"
+  const pubExtras = (
+    category: PoiCategory,
+    tags: Record<string, string>,
+    point: [number, number],
+  ): Pick<Poi, 'mooringM' | 'mooring'> => {
+    if (category !== 'pub') return {}
+    const extras: Pick<Poi, 'mooringM' | 'mooring'> = {}
+    if (tags['mooring']) extras.mooring = tags['mooring']
+    if (options.moorings) {
+      const d = distanceToNetworkM(options.moorings, point)
+      if (d <= 400) extras.mooringM = Math.round(d)
+    }
+    return extras
+  }
 
   const pois: Poi[] = []
   for (const node of data.nodes.values()) {
@@ -188,6 +209,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       name: node.tags['name'] ?? null,
       point,
       walkM,
+      ...pubExtras(category, node.tags, point),
       source: 'osm',
     })
   }
@@ -204,6 +226,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       name: way.tags['name'] ?? null,
       point,
       walkM,
+      ...pubExtras(category, way.tags, point),
       source: 'osm',
     })
   }
