@@ -668,11 +668,13 @@ export default function MapScreen() {
                 })
               }}
             >
+              {/* photo pins grow with zoom, Google featured-place style */}
               <MapLibre.Layer
                 type="circle"
                 id="my-mooring-ring"
+                filter={['==', ['get', 'hasPhoto'], true]}
                 paint={{
-                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 13],
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 26],
                   'circle-color': '#FFFFFF',
                   'circle-stroke-color': day.shieldRed,
                   'circle-stroke-width': 3,
@@ -684,7 +686,7 @@ export default function MapScreen() {
                 filter={['==', ['get', 'hasPhoto'], true]}
                 layout={{
                   'icon-image': ['concat', 'photo-', ['get', 'id']],
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.05, 15, 0.11],
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.075, 16, 0.25],
                   'icon-allow-overlap': true,
                 }}
               />
@@ -893,7 +895,7 @@ export default function MapScreen() {
               {stops && stops.length > 0 && (
                 <Pressable onPress={() => setStopsOpen(true)}>
                   <Text style={styles.routeStopsLink}>
-                    {stops.length} stops along the way — water, pubs, moorings…
+                    {stops.length} places along the way — water, pubs, moorings…
                   </Text>
                 </Pressable>
               )}
