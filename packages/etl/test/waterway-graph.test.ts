@@ -227,3 +227,40 @@ describe('planJourney line geometry', () => {
     expect(haversineMeters(journey.line[0]!, startSnap.point)).toBeLessThan(30)
   })
 })
+
+describe('planJourney day breakdown', () => {
+  it('splits a multi-day journey into sane cruising days', async () => {
+    const { planJourney } = await import('@moorhen/graph')
+    const journey = planJourney(graph, [-1.24, 52.277], [-1.16, 52.288])!
+    // short trip: single day, ending at the destination
+    expect(journey.days.length).toBe(1)
+    expect(journey.days[0]!.endPoint).toEqual(journey.line[journey.line.length - 1])
+
+    // force multi-day with a tiny cruising day
+    const { DEFAULT_TIMING_PROFILE } = await import('@moorhen/graph')
+    const slow = { ...DEFAULT_TIMING_PROFILE, cruisingHoursPerDay: 1 }
+    const multi = planJourney(graph, [-1.24, 52.277], [-1.16, 52.288], slow)!
+    expect(multi.days.length).toBeGreaterThan(1)
+    const totalM = multi.days.reduce((sum, d) => sum + d.distanceM, 0)
+    expect(Math.abs(totalM - multi.distanceM) / multi.distanceM).toBeLessThan(0.01)
+    const totalS = multi.days.reduce((sum, d) => sum + d.seconds, 0)
+    expect(Math.abs(totalS - multi.totalSeconds)).toBeLessThan(60)
+    // every day except the last is a full cruising day
+    for (const d of multi.days.slice(0, -1)) {
+      expect(Math.abs(d.seconds - 3600)).toBeLessThan(1)
+    }
+  })
+})
+
+describe('day breakdown lock apportioning', () => {
+  it('splits a leg-spanning lock count across days and preserves the total', async () => {
+    const { planJourney, DEFAULT_TIMING_PROFILE } = await import('@moorhen/graph')
+    const slow = { ...DEFAULT_TIMING_PROFILE, cruisingHoursPerDay: 1 }
+    const journey = planJourney(graph, [-1.24, 52.277], [-1.16, 52.288], slow)!
+    const totalLocks = journey.days.reduce((sum, d) => sum + d.lockCount, 0)
+    expect(totalLocks).toBe(journey.narrowLocks + journey.broadLocks)
+    // the 6 Braunston chambers shouldn't all land on one tiny day
+    const maxDayLocks = Math.max(...journey.days.map((d) => d.lockCount))
+    expect(maxDayLocks).toBeLessThan(journey.narrowLocks + journey.broadLocks)
+  })
+})

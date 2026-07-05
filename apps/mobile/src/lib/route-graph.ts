@@ -2,6 +2,7 @@ import {
   DEFAULT_TIMING_PROFILE,
   formatJourneyDuration,
   planJourney,
+  type JourneyDay,
   type LonLat,
   type WaterwayEdge,
   type WaterwayGraph,
@@ -42,6 +43,7 @@ export interface PlannedRoute {
   broadLocks: number
   durationLabel: string
   cruisingDays: number
+  days: JourneyDay[]
 }
 
 export function planRoute(
@@ -60,5 +62,6 @@ export function planRoute(
     broadLocks: journey.broadLocks,
     durationLabel: formatJourneyDuration(journey.totalSeconds, profile),
     cruisingDays: journey.cruisingDays,
+    days: journey.days,
   }
 }

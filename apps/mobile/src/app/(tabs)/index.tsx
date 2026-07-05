@@ -14,10 +14,9 @@ import {
   subscribeMoorings,
   type SavedMooring,
 } from '../../lib/moorings-store'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
-import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
-import { findRouteStops, type RouteStop } from '../../lib/route-stops'
+import { plannerStore, usePlanner } from '../../lib/planner-store'
+import type { RouteStop } from '../../lib/route-stops'
 import {
   DetailSheet,
   pubMooringNote,
@@ -176,31 +175,10 @@ export default function MapScreen() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [plannerOpen, setPlannerOpen] = useState(false)
   const [searchTarget, setSearchTarget] = useState<'place' | 'from' | 'to'>('place')
-  const [fromEntry, setFromEntry] = useState<SearchEntry | null>(null)
-  const [toEntry, setToEntry] = useState<SearchEntry | null>(null)
   const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
-  const [route, setRoute] = useState<PlannedRoute | null>(null)
-  const [planning, setPlanning] = useState(false)
-  const [stops, setStops] = useState<RouteStop[] | null>(null)
   const [stopsOpen, setStopsOpen] = useState(false)
-  const [hoursPerDay, setHoursPerDay] = useState(7)
-
-  useEffect(() => {
-    AsyncStorage.getItem('moorhen.pace.hoursPerDay')
-      .then((saved) => {
-        const parsed = Number(saved)
-        if (Number.isFinite(parsed) && parsed >= 3 && parsed <= 12) setHoursPerDay(parsed)
-      })
-      .catch(() => {})
-  }, [])
-
-  const adjustPace = useCallback((delta: number) => {
-    setHoursPerDay((current) => {
-      const next = Math.min(12, Math.max(3, current + delta))
-      AsyncStorage.setItem('moorhen.pace.hoursPerDay', String(next)).catch(() => {})
-      return next
-    })
-  }, [])
+  const { from: fromEntry, to: toEntry, route, planning, stops, hoursPerDay } = usePlanner()
+  const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
   useEffect(() => {
@@ -273,21 +251,18 @@ export default function MapScreen() {
       const raw = event.nativeEvent.lngLat
       const point: [number, number] = Array.isArray(raw) ? [raw[0], raw[1]] : [raw.lng, raw.lat]
       if (route || (!routeStart && !planning)) {
-        setRoute(null)
+        plannerStore.clear()
         setRouteStart(point)
         return
       }
       if (!routeStart || planning) return
-      setPlanning(true)
-      try {
-        const graph = await loadGraph()
-        setRoute(planRoute(graph, routeStart, point, hoursPerDay))
-      } catch {
-        setRoute(null)
-      } finally {
-        setPlanning(false)
-        setRouteStart(null)
-      }
+      plannerStore.setEndpoint('from', {
+        name: 'Dropped pin',
+        kind: 'Map point',
+        point: routeStart,
+      })
+      plannerStore.setEndpoint('to', { name: 'Dropped pin', kind: 'Map point', point })
+      setRouteStart(null)
     },
     [route, routeStart, planning],
   )
@@ -295,12 +270,8 @@ export default function MapScreen() {
   const onSearchSelect = useCallback(
     (entry: SearchEntry) => {
       setSearchOpen(false)
-      if (searchTarget === 'from') {
-        setFromEntry(entry)
-        return
-      }
-      if (searchTarget === 'to') {
-        setToEntry(entry)
+      if (searchTarget === 'from' || searchTarget === 'to') {
+        plannerStore.setEndpoint(searchTarget, entry)
         return
       }
       cameraRef.current?.easeTo({ center: entry.point, zoom: 14, duration: 700 })
@@ -309,57 +280,26 @@ export default function MapScreen() {
     [searchTarget],
   )
 
-  // auto-plan when both ends are chosen
+  // fit the camera when a route lands (planning happens in the store)
   useEffect(() => {
-    if (!fromEntry || !toEntry) return
-    let cancelled = false
-    setPlanning(true)
-    setRoute(null)
-    loadGraph()
-      .then((graph) => {
-        if (cancelled) return
-        const planned = planRoute(graph, fromEntry.point, toEntry.point, hoursPerDay)
-        setRoute(planned)
-        if (planned) {
-          const lons = [fromEntry.point[0], toEntry.point[0]]
-          const lats = [fromEntry.point[1], toEntry.point[1]]
-          cameraRef.current?.easeTo({
-            center: [(lons[0]! + lons[1]!) / 2, (lats[0]! + lats[1]!) / 2],
-            zoom: 9.5,
-            duration: 900,
-          })
-        }
-      })
-      .catch(() => setRoute(null))
-      .finally(() => {
-        if (!cancelled) setPlanning(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [fromEntry, toEntry, hoursPerDay])
+    if (!route || !fromEntry || !toEntry) return
+    const lons = [fromEntry.point[0], toEntry.point[0]]
+    const lats = [fromEntry.point[1], toEntry.point[1]]
+    cameraRef.current?.easeTo({
+      center: [(lons[0]! + lons[1]!) / 2, (lats[0]! + lats[1]!) / 2],
+      zoom: 9.5,
+      duration: 900,
+    })
+  }, [route, fromEntry, toEntry])
+
+  useEffect(() => {
+    if (!route) setStopsOpen(false)
+  }, [route])
 
   const clearPlanner = useCallback(() => {
     setPlannerOpen(false)
-    setFromEntry(null)
-    setToEntry(null)
-    setRoute(null)
+    plannerStore.clear()
   }, [])
-
-  useEffect(() => {
-    setStops(null)
-    setStopsOpen(false)
-    if (!route) return
-    let cancelled = false
-    findRouteStops(route.line)
-      .then((found) => {
-        if (!cancelled) setStops(found)
-      })
-      .catch(() => setStops(null))
-    return () => {
-      cancelled = true
-    }
-  }, [route])
 
   const onStopSelect = useCallback((stop: RouteStop) => {
     setStopsOpen(false)
@@ -832,7 +772,7 @@ export default function MapScreen() {
                     const permission = await Location.requestForegroundPermissionsAsync()
                     if (!permission.granted) return
                     const position = await Location.getCurrentPositionAsync({})
-                    setFromEntry({
+                    plannerStore.setEndpoint('from', {
                       name: 'My location',
                       kind: 'Current position',
                       point: [position.coords.longitude, position.coords.latitude],
@@ -856,13 +796,7 @@ export default function MapScreen() {
               </Pressable>
             </View>
             <View style={styles.plannerActions}>
-              <Pressable
-                onPress={() => {
-                  setFromEntry(toEntry)
-                  setToEntry(fromEntry)
-                }}
-                hitSlop={10}
-              >
+              <Pressable onPress={() => plannerStore.swap()} hitSlop={10}>
                 <Feather name="repeat" size={17} color={day.ink2} />
               </Pressable>
               <Pressable onPress={clearPlanner} hitSlop={10}>
@@ -927,7 +861,7 @@ export default function MapScreen() {
                 </Pressable>
               </View>
             </View>
-            <Pressable onPress={() => setRoute(null)} hitSlop={12}>
+            <Pressable onPress={() => plannerStore.clear()} hitSlop={12}>
               <Feather name="x" size={18} color={day.ink3} />
             </Pressable>
           </View>

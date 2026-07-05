@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { getLocks, getMoorings, getPois } from '../lib/artifacts'
+import { loadPlacesIndex, type PlaceEntry } from '../lib/places-index'
 import { day, font, radius } from '../theme'
 
 /**
@@ -21,13 +21,7 @@ import { day, font, radius } from '../theme'
  * per session and searched in memory.
  */
 
-export interface SearchEntry {
-  name: string
-  kind: string
-  /** Nearest waterway name — disambiguates the eight Anchor Inns. */
-  waterway?: string
-  point: [number, number]
-}
+export type SearchEntry = PlaceEntry
 
 const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Junction: 'source-branch',
@@ -40,59 +34,6 @@ const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> =
   'Water point': 'faucet',
   'Winding hole': 'autorenew',
   Place: 'map-marker',
-}
-
-const POI_KINDS: Record<string, string> = {
-  junction: 'Junction',
-  'winding-hole': 'Winding hole',
-  pub: 'Pub',
-  shop: 'Shop',
-  station: 'Railway station',
-  laundry: 'Laundry',
-  'water-point': 'Water point',
-  fuel: 'Place',
-  chandlery: 'Place',
-  elsan: 'Place',
-}
-
-let indexPromise: Promise<SearchEntry[]> | null = null
-
-function loadIndex(): Promise<SearchEntry[]> {
-  indexPromise ??= (async () => {
-    const entries: SearchEntry[] = []
-    const [locks, pois, moorings] = await Promise.all([getLocks(), getPois(), getMoorings()])
-    for (const f of (locks as GeoJSON.FeatureCollection).features) {
-      const name = f.properties?.['name'] as string | null
-      const waterway = f.properties?.['waterway'] as string | null
-      if (!name) continue
-      entries.push({
-        name: waterway ? `${name} (${waterway})` : name,
-        kind: 'Lock',
-        point: (f.geometry as GeoJSON.Point).coordinates as [number, number],
-      })
-    }
-    for (const f of (pois as GeoJSON.FeatureCollection).features) {
-      const name = f.properties?.['name'] as string | null
-      if (!name) continue
-      const kind = POI_KINDS[String(f.properties?.['category'])]
-      if (!kind) continue
-      const waterway = f.properties?.['waterway'] as string | undefined
-      entries.push({
-        name,
-        kind,
-        ...(waterway ? { waterway } : {}),
-        point: (f.geometry as GeoJSON.Point).coordinates as [number, number],
-      })
-    }
-    for (const f of (moorings as GeoJSON.FeatureCollection).features) {
-      const name = f.properties?.['name'] as string | null
-      if (!name) continue
-      const line = (f.geometry as GeoJSON.LineString).coordinates as [number, number][]
-      entries.push({ name, kind: 'Mooring', point: line[Math.floor(line.length / 2)]! })
-    }
-    return entries
-  })()
-  return indexPromise
 }
 
 export function SearchModal({
@@ -113,7 +54,7 @@ export function SearchModal({
     if (!visible) return
     setQuery('')
     if (!index) {
-      loadIndex()
+      loadPlacesIndex()
         .then(setIndex)
         .catch(() => setIndex([]))
     }

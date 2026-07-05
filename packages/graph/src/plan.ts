@@ -1,9 +1,10 @@
-import { buildChainage, projectOntoChainage, type LonLat } from './chainage'
+import { buildChainage, pointAtChainage, projectOntoChainage, type LonLat } from './chainage'
 import type { EdgeLock, WaterwayEdge, WaterwayGraph } from './builder'
 import { shortestRoute } from './route'
 import {
   DEFAULT_TIMING_PROFILE,
   edgeToTimingEdge,
+  edgeTraversalSeconds,
   estimateJourney,
   type TimingProfile,
 } from './timing'
@@ -107,6 +108,16 @@ function partialEdge(snap: NetworkSnap, towards: 'a' | 'b', virtualId: number): 
   }
 }
 
+export interface JourneyDay {
+  /** 1-based day number. */
+  day: number
+  distanceM: number
+  lockCount: number
+  seconds: number
+  /** Where this cruising day ends (route end for the final day). */
+  endPoint: LonLat
+}
+
 export interface PlannedJourney {
   line: LonLat[]
   distanceM: number
@@ -114,6 +125,8 @@ export interface PlannedJourney {
   broadLocks: number
   totalSeconds: number
   cruisingDays: number
+  /** The journey split into days of profile.cruisingHoursPerDay. */
+  days: JourneyDay[]
 }
 
 function summarize(
@@ -142,7 +155,69 @@ function summarize(
     broadLocks,
     totalSeconds: estimate.totalSeconds,
     cruisingDays: estimate.cruisingDays,
+    days: splitIntoDays(legs, profile),
   }
+}
+
+/**
+ * Split the journey into cruising days. Day boundaries falling inside a leg
+ * are placed by time fraction along that leg's geometry — locks are charged
+ * at leg granularity, so a boundary mid-flight lands approximately; real
+ * plans stop at moorings anyway, and the nearest-named-place lookup smooths
+ * the rest.
+ */
+function splitIntoDays(
+  legs: Array<{ edge: WaterwayEdge; forward: boolean }>,
+  profile: TimingProfile,
+): JourneyDay[] {
+  const daySeconds = profile.cruisingHoursPerDay * 3600
+  const days: JourneyDay[] = []
+  let acc = { seconds: 0, distanceM: 0, locks: 0 }
+  let lockCarry = 0 // fractional locks apportioned but not yet emitted
+  let endPoint: LonLat | null = null
+
+  const flush = (point: LonLat) => {
+    const whole = Math.round(acc.locks + lockCarry)
+    lockCarry = acc.locks + lockCarry - whole
+    days.push({
+      day: days.length + 1,
+      distanceM: acc.distanceM,
+      lockCount: whole,
+      seconds: acc.seconds,
+      endPoint: point,
+    })
+    acc = { seconds: 0, distanceM: 0, locks: 0 }
+  }
+
+  for (const { edge, forward } of legs) {
+    const geometry = forward ? edge.geometry : [...edge.geometry].reverse()
+    const legSeconds = edgeTraversalSeconds(edgeToTimingEdge(edge), 1, profile)
+    const legLocks = edge.narrowLocks + edge.broadLocks
+    let legRemainingS = legSeconds
+    let legRemainingM = edge.lengthM
+    let consumedM = 0
+
+    while (acc.seconds + legRemainingS >= daySeconds && legSeconds > 0) {
+      const need = daySeconds - acc.seconds
+      const fraction = need / legRemainingS
+      const stepM = legRemainingM * fraction
+      consumedM += stepM
+      acc.seconds += need
+      acc.distanceM += stepM
+      // locks split by the share of the leg's time spent this day
+      acc.locks += legLocks * (need / legSeconds)
+      const chain = buildChainage(geometry)
+      flush(pointAtChainage(chain, Math.min(consumedM, chain.totalMeters)))
+      legRemainingS -= need
+      legRemainingM -= stepM
+    }
+    acc.seconds += legRemainingS
+    acc.distanceM += legRemainingM
+    acc.locks += legLocks * (legSeconds > 0 ? legRemainingS / legSeconds : 0)
+    endPoint = geometry[geometry.length - 1]!
+  }
+  if (endPoint && (acc.seconds > 60 || days.length === 0)) flush(endPoint)
+  return days
 }
 
 const VIRTUAL_START = -1

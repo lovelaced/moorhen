@@ -1,122 +1,229 @@
 import Feather from '@expo/vector-icons/Feather'
-import {
-  DEFAULT_TIMING_PROFILE,
-  estimateJourney,
-  formatJourneyDuration,
-  type TimingEdge,
-} from '@moorhen/graph'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
+import { DEFAULT_TIMING_PROFILE, type JourneyDay } from '@moorhen/graph'
+import { useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { day, font, radius, shadow } from '../../theme'
+import { SearchModal } from '../../components/search-modal'
+import { loadPlacesIndex, nearestNamed, type PlaceEntry } from '../../lib/places-index'
+import { plannerStore, usePlanner } from '../../lib/planner-store'
+import { day as dayTheme, font, radius, shadow } from '../../theme'
 
 /**
- * Route planner. The numbers on screen are computed live by the shared
- * timing model in @moorhen/graph — the same code the ETL and alerts use.
- * Demo journey until the routable graph artifact is wired in.
+ * The journey-planning home. Shares the planner store with the Map tab —
+ * pick endpoints on either screen and both stay in sync; this one adds the
+ * day-by-day breakdown ("day 2 ends near Norton Junction") and pace tuning.
  */
-const MILE = 1609.344
-
-const DEMO_LEGS = [
-  {
-    edge: {
-      lengthM: 37 * MILE,
-      waterwayClass: 'broad-canal',
-      broadLocks: 23,
-      flightLocks: 12,
-      tunnelM: 1867,
-    } satisfies TimingEdge,
-    direction: 1 as const,
-  },
-]
-
-const DAYS = [
-  {
-    n: 1,
-    title: 'Braunston → Weedon Bec',
-    meta: '7 h 05 · 13 locks · Braunston Tunnel · moor at Weedon Wharf ★ 4.5',
-  },
-  {
-    n: 2,
-    title: 'Weedon Bec → Leamington Spa',
-    meta: '6 h 50 · 10 locks · water at Braunston Turn · Tesco 6 min from mooring',
-  },
-  {
-    n: 3,
-    title: 'Leamington Spa → Birmingham',
-    meta: '5 h 45 · 12 locks (Hatton flight — allow extra) · arrive Gas Street Basin',
-  },
-]
-
 export default function PlanScreen() {
-  const estimate = estimateJourney(DEMO_LEGS)
-  const profile = DEFAULT_TIMING_PROFILE
+  const { from, to, route, planning, stops, hoursPerDay } = usePlanner()
+  const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
+  const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    loadPlacesIndex()
+      .then(setPlaces)
+      .catch(() => setPlaces(null))
+  }, [])
+
+  const mph = DEFAULT_TIMING_PROFILE.cruiseSpeedMps['narrow-canal'] / 0.44704
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Braunston → Birmingham</Text>
-            <Text style={styles.subtitle}>Grand Union main line · via Braunston Tunnel</Text>
-          </View>
-        </View>
+        <Text style={styles.title}>Plan a cruise</Text>
 
         <View style={[styles.card, shadow.card]}>
-          <View style={styles.summaryTop}>
-            <Text style={styles.bigTime}>{formatJourneyDuration(estimate.totalSeconds)}</Text>
-            <View style={styles.pacePill}>
-              <Text style={styles.pacePillText}>
-                {Math.ceil(estimate.cruisingDays)} days at your pace
-              </Text>
-            </View>
-          </View>
-          <View style={styles.statsRow}>
-            <Stat icon="flag" value="37.2 mi" label="distance" />
-            <Stat icon="chevrons-up" value={String(estimate.lockCount)} label="locks" />
-            <Stat icon="circle" value="1" label="tunnel" />
-            <Stat icon="droplet" value="6" label="water points" />
-          </View>
-        </View>
-
-        <View style={styles.warnCard}>
-          <Feather name="alert-triangle" size={20} color="#B98A16" />
-          <View style={styles.warnCol}>
-            <Text style={styles.warnTitle}>Winter works clash with your dates</Text>
-            <Text style={styles.warnBody}>
-              Buckby Locks close 5 Nov – 20 Dec. At your pace you'd arrive 12 Nov. Leave 8 days
-              earlier, or reroute via the Leicester line.
+          <Pressable style={styles.field} onPress={() => setSearchTarget('from')}>
+            <View style={styles.dotStart} />
+            <Text style={from ? styles.fieldValue : styles.fieldPlaceholder} numberOfLines={1}>
+              {from?.name ?? 'Choose start…'}
             </Text>
-            <Text style={styles.warnLink}>See options</Text>
+          </Pressable>
+          <Pressable style={styles.field} onPress={() => setSearchTarget('to')}>
+            <View style={styles.dotEnd} />
+            <Text style={to ? styles.fieldValue : styles.fieldPlaceholder} numberOfLines={1}>
+              {to?.name ?? 'Choose destination…'}
+            </Text>
+          </Pressable>
+          <View style={styles.fieldActions}>
+            <Pressable style={styles.actionChip} onPress={() => plannerStore.swap()} hitSlop={8}>
+              <Feather name="repeat" size={14} color={dayTheme.ink2} />
+              <Text style={styles.actionChipText}>Swap</Text>
+            </Pressable>
+            {(from || to) && (
+              <Pressable style={styles.actionChip} onPress={() => plannerStore.clear()} hitSlop={8}>
+                <Feather name="x" size={14} color={dayTheme.ink2} />
+                <Text style={styles.actionChipText}>Clear</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Day by day</Text>
-        {DAYS.map((dayPlan) => (
-          <View key={dayPlan.n} style={styles.dayRow}>
-            <View style={styles.dayDot}>
-              <Text style={styles.dayDotText}>{dayPlan.n}</Text>
-            </View>
-            <View style={styles.dayCol}>
-              <Text style={styles.dayTitle}>{dayPlan.title}</Text>
-              <Text style={styles.dayMeta}>{dayPlan.meta}</Text>
-            </View>
+        {planning && (
+          <View style={[styles.card, shadow.card, styles.planningRow]}>
+            <ActivityIndicator color={dayTheme.green} />
+            <Text style={styles.planningText}>Planning route…</Text>
           </View>
-        ))}
+        )}
+
+        {route && (
+          <>
+            <View style={[styles.card, shadow.card]}>
+              <View style={styles.summaryTop}>
+                <Text style={styles.bigTime}>{route.durationLabel}</Text>
+                <View style={styles.pacePill}>
+                  <Text style={styles.pacePillText}>
+                    {Math.ceil(route.cruisingDays)} day
+                    {Math.ceil(route.cruisingDays) === 1 ? '' : 's'} at your pace
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statsRow}>
+                <Stat
+                  icon="map-marker-distance"
+                  value={`${(route.distanceM / 1609.344).toFixed(1)} mi`}
+                  label="distance"
+                />
+                <Stat
+                  icon="chevron-double-up"
+                  value={String(route.narrowLocks + route.broadLocks)}
+                  label="locks"
+                />
+                <Stat
+                  icon="faucet"
+                  value={String(stops?.filter((s) => s.icon === 'water').length ?? '—')}
+                  label="water points"
+                />
+                <Stat
+                  icon="glass-mug-variant"
+                  value={String(stops?.filter((s) => s.icon === 'pub').length ?? '—')}
+                  label="pubs"
+                />
+              </View>
+              <Pressable style={styles.mapButton} onPress={() => router.navigate('/')}>
+                <Feather name="map" size={15} color="#FFFFFF" />
+                <Text style={styles.mapButtonText}>View on map</Text>
+              </Pressable>
+            </View>
+
+            {route.days.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Day by day</Text>
+                {route.days.map((journeyDay) => (
+                  <DayRow
+                    key={journeyDay.day}
+                    journeyDay={journeyDay}
+                    places={places}
+                    final={journeyDay.day === route.days.length}
+                    destination={to?.name ?? null}
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
 
         <View style={[styles.paceCard, shadow.pill]}>
-          <Feather name="sliders" size={18} color={day.ink2} />
-          <View style={styles.dayCol}>
+          <Feather name="sliders" size={18} color={dayTheme.ink2} />
+          <View style={styles.paceCol}>
             <Text style={styles.paceTitle}>Your pace</Text>
             <Text style={styles.paceMeta}>
-              {(profile.cruiseSpeedMps['broad-canal'] / 0.44704).toFixed(1)} mph ·{' '}
-              {profile.minutesPerBroadLock} min per lock · {profile.cruisingHoursPerDay} h cruising
-              days
+              {mph.toFixed(1)} mph on narrow canals · {hoursPerDay} h cruising per day
             </Text>
           </View>
-          <Text style={styles.paceAdjust}>Adjust</Text>
+          <Pressable
+            style={styles.paceButton}
+            hitSlop={8}
+            disabled={hoursPerDay <= 3}
+            onPress={() => plannerStore.adjustPace(-1)}
+          >
+            <Feather
+              name="minus"
+              size={15}
+              color={hoursPerDay <= 3 ? dayTheme.ink3 : dayTheme.ink}
+            />
+          </Pressable>
+          <Pressable
+            style={styles.paceButton}
+            hitSlop={8}
+            disabled={hoursPerDay >= 12}
+            onPress={() => plannerStore.adjustPace(1)}
+          >
+            <Feather
+              name="plus"
+              size={15}
+              color={hoursPerDay >= 12 ? dayTheme.ink3 : dayTheme.ink}
+            />
+          </Pressable>
         </View>
+
+        {!route && !planning && (
+          <Text style={styles.emptyHint}>
+            Pick a start and destination — locks, junctions, moorings, pubs and places are all
+            searchable. The map draws the route; this screen breaks it into cruising days.
+          </Text>
+        )}
       </ScrollView>
+
+      <SearchModal
+        visible={searchTarget !== null}
+        onClose={() => setSearchTarget(null)}
+        onSelect={(entry) => {
+          if (searchTarget) plannerStore.setEndpoint(searchTarget, entry)
+          setSearchTarget(null)
+        }}
+        placeholder={
+          searchTarget === 'from'
+            ? 'Route start: lock, mooring, place…'
+            : 'Route destination: lock, mooring, place…'
+        }
+      />
     </SafeAreaView>
+  )
+}
+
+function DayRow({
+  journeyDay,
+  places,
+  final,
+  destination,
+}: {
+  journeyDay: JourneyDay
+  places: PlaceEntry[] | null
+  final: boolean
+  destination: string | null
+}) {
+  const roundedMinutes = Math.round(journeyDay.seconds / 60 / 5) * 5
+  const hours = Math.floor(roundedMinutes / 60)
+  const minutes = roundedMinutes % 60
+  const near =
+    final && destination
+      ? destination
+      : places
+        ? nearestNamed(places, journeyDay.endPoint as [number, number])?.name
+        : null
+
+  return (
+    <View style={styles.dayRow}>
+      <View style={styles.dayDot}>
+        <Text style={styles.dayDotText}>{journeyDay.day}</Text>
+      </View>
+      <View style={styles.dayCol}>
+        <Text style={styles.dayTitle}>
+          {(journeyDay.distanceM / 1609.344).toFixed(1)} mi
+          {journeyDay.lockCount > 0
+            ? ` · ${journeyDay.lockCount} lock${journeyDay.lockCount === 1 ? '' : 's'}`
+            : ''}
+          {` · ${hours} h${minutes > 0 ? ` ${minutes} min` : ''}`}
+        </Text>
+        <Text style={styles.dayMeta}>
+          {final ? 'arrive ' : 'ends near '}
+          {near ?? 'the cut'}
+        </Text>
+      </View>
+    </View>
   )
 }
 
@@ -125,13 +232,13 @@ function Stat({
   value,
   label,
 }: {
-  icon: keyof typeof Feather.glyphMap
+  icon: keyof typeof MaterialCommunityIcons.glyphMap
   value: string
   label: string
 }) {
   return (
     <View style={styles.stat}>
-      <Feather name={icon} size={16} color={day.ink3} />
+      <MaterialCommunityIcons name={icon} size={17} color={dayTheme.ink3} />
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -139,60 +246,77 @@ function Stat({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: day.bg },
-  content: { padding: 20, gap: 16 },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  title: { fontFamily: font.semibold, fontSize: 18, color: day.ink, letterSpacing: -0.2 },
-  subtitle: { fontFamily: font.regular, fontSize: 12, color: day.ink2, marginTop: 2 },
-  card: {
-    backgroundColor: day.surface,
-    borderRadius: radius.card,
-    padding: 18,
-    gap: 14,
+  root: { flex: 1, backgroundColor: dayTheme.bg },
+  content: { padding: 20, gap: 14 },
+  title: { fontFamily: font.semibold, fontSize: 24, color: dayTheme.ink, letterSpacing: -0.4 },
+  card: { backgroundColor: dayTheme.surface, borderRadius: radius.card, padding: 16, gap: 10 },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 46,
+    borderRadius: radius.control,
+    backgroundColor: dayTheme.surfaceMuted,
+    paddingHorizontal: 14,
   },
+  fieldValue: { fontFamily: font.medium, fontSize: 14, color: dayTheme.ink, flex: 1 },
+  fieldPlaceholder: { fontFamily: font.regular, fontSize: 14, color: dayTheme.ink3, flex: 1 },
+  dotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: dayTheme.green },
+  dotEnd: { width: 10, height: 10, borderRadius: 3, backgroundColor: dayTheme.shieldRed },
+  fieldActions: { flexDirection: 'row', gap: 8 },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: dayTheme.surfaceMuted,
+  },
+  actionChipText: { fontFamily: font.medium, fontSize: 12, color: dayTheme.ink2 },
+  planningRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  planningText: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  bigTime: { fontFamily: font.bold, fontSize: 32, color: day.ink, letterSpacing: -1 },
+  bigTime: { fontFamily: font.bold, fontSize: 30, color: dayTheme.ink, letterSpacing: -1 },
   pacePill: {
-    backgroundColor: day.greenSoft,
+    backgroundColor: dayTheme.greenSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     height: 28,
     justifyContent: 'center',
   },
-  pacePillText: { fontFamily: font.semibold, fontSize: 12, color: day.greenDark },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  stat: { alignItems: 'center', gap: 3 },
-  statValue: { fontFamily: font.semibold, fontSize: 15, color: day.ink },
-  statLabel: { fontFamily: font.regular, fontSize: 11, color: day.ink3 },
-  warnCard: {
-    backgroundColor: day.amberSoft,
+  pacePillText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.greenDark },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  stat: { alignItems: 'center', gap: 3, minWidth: 64 },
+  statValue: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink },
+  statLabel: { fontFamily: font.regular, fontSize: 11, color: dayTheme.ink3 },
+  mapButton: {
+    marginTop: 6,
+    height: 44,
     borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: '#E8B83066',
-    padding: 12,
+    backgroundColor: dayTheme.green,
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  warnCol: { flex: 1, gap: 3 },
-  warnTitle: { fontFamily: font.semibold, fontSize: 14, color: day.ink },
-  warnBody: { fontFamily: font.regular, fontSize: 12, color: day.ink2, lineHeight: 17 },
-  warnLink: { fontFamily: font.semibold, fontSize: 12, color: day.green },
-  sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: day.ink },
-  dayRow: { flexDirection: 'row', gap: 12 },
+  mapButtonText: { fontFamily: font.semibold, fontSize: 14, color: '#FFFFFF' },
+  sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink, marginTop: 4 },
+  dayRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dayDot: {
     width: 28,
     height: 28,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: dayTheme.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayDotText: { fontFamily: font.semibold, fontSize: 12, color: day.greenDark },
+  dayDotText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.greenDark },
   dayCol: { flex: 1, gap: 2 },
-  dayTitle: { fontFamily: font.semibold, fontSize: 14, color: day.ink },
-  dayMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2, lineHeight: 17 },
+  dayTitle: { fontFamily: font.semibold, fontSize: 14, color: dayTheme.ink },
+  dayMeta: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2 },
   paceCard: {
-    backgroundColor: day.surface,
+    backgroundColor: dayTheme.surface,
     borderRadius: radius.control,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -200,7 +324,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  paceTitle: { fontFamily: font.semibold, fontSize: 13, color: day.ink },
-  paceMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
-  paceAdjust: { fontFamily: font.semibold, fontSize: 12, color: day.green },
+  paceCol: { flex: 1, gap: 2 },
+  paceTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
+  paceMeta: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2 },
+  paceButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    backgroundColor: dayTheme.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHint: {
+    fontFamily: font.regular,
+    fontSize: 13,
+    color: dayTheme.ink2,
+    lineHeight: 19,
+    paddingHorizontal: 4,
+  },
 })
