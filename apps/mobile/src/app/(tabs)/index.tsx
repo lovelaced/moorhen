@@ -147,6 +147,10 @@ export default function MapScreen() {
   const [active, setActive] = useState<Set<ChipKey>>(new Set(['moorings', 'water']))
   const [stoppages, setStoppages] = useState<GeoJSON.FeatureCollection | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [plannerOpen, setPlannerOpen] = useState(false)
+  const [searchTarget, setSearchTarget] = useState<'place' | 'from' | 'to'>('place')
+  const [fromEntry, setFromEntry] = useState<SearchEntry | null>(null)
+  const [toEntry, setToEntry] = useState<SearchEntry | null>(null)
   const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
   const [route, setRoute] = useState<PlannedRoute | null>(null)
   const [planning, setPlanning] = useState(false)
@@ -225,10 +229,58 @@ export default function MapScreen() {
     [route, routeStart, planning],
   )
 
-  const onSearchSelect = useCallback((entry: SearchEntry) => {
-    setSearchOpen(false)
-    cameraRef.current?.easeTo({ center: entry.point, zoom: 14, duration: 700 })
-    setSelected({ title: entry.name, subtitle: entry.kind, details: [], coords: entry.point })
+  const onSearchSelect = useCallback(
+    (entry: SearchEntry) => {
+      setSearchOpen(false)
+      if (searchTarget === 'from') {
+        setFromEntry(entry)
+        return
+      }
+      if (searchTarget === 'to') {
+        setToEntry(entry)
+        return
+      }
+      cameraRef.current?.easeTo({ center: entry.point, zoom: 14, duration: 700 })
+      setSelected({ title: entry.name, subtitle: entry.kind, details: [], coords: entry.point })
+    },
+    [searchTarget],
+  )
+
+  // auto-plan when both ends are chosen
+  useEffect(() => {
+    if (!fromEntry || !toEntry) return
+    let cancelled = false
+    setPlanning(true)
+    setRoute(null)
+    loadGraph()
+      .then((graph) => {
+        if (cancelled) return
+        const planned = planRoute(graph, fromEntry.point, toEntry.point)
+        setRoute(planned)
+        if (planned) {
+          const lons = [fromEntry.point[0], toEntry.point[0]]
+          const lats = [fromEntry.point[1], toEntry.point[1]]
+          cameraRef.current?.easeTo({
+            center: [(lons[0]! + lons[1]!) / 2, (lats[0]! + lats[1]!) / 2],
+            zoom: 9.5,
+            duration: 900,
+          })
+        }
+      })
+      .catch(() => setRoute(null))
+      .finally(() => {
+        if (!cancelled) setPlanning(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [fromEntry, toEntry])
+
+  const clearPlanner = useCallback(() => {
+    setPlannerOpen(false)
+    setFromEntry(null)
+    setToEntry(null)
+    setRoute(null)
   }, [])
 
   const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -535,7 +587,13 @@ export default function MapScreen() {
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.searchRow}>
-          <Pressable style={[styles.searchPill, shadow.pill]} onPress={() => setSearchOpen(true)}>
+          <Pressable
+            style={[styles.searchPill, shadow.pill]}
+            onPress={() => {
+              setSearchTarget('place')
+              setSearchOpen(true)
+            }}
+          >
             <Feather name="search" size={18} color={day.ink3} />
             <Text style={styles.searchText}>Search locks, moorings, places…</Text>
           </Pressable>
@@ -566,9 +624,58 @@ export default function MapScreen() {
           })}
         </ScrollView>
 
+        {plannerOpen && (
+          <View style={[styles.plannerCard, shadow.card]}>
+            <View style={styles.plannerRows}>
+              <Pressable
+                style={styles.plannerField}
+                onPress={() => {
+                  setSearchTarget('from')
+                  setSearchOpen(true)
+                }}
+              >
+                <View style={styles.plannerDotStart} />
+                <Text style={fromEntry ? styles.plannerValue : styles.plannerPlaceholder}>
+                  {fromEntry?.name ?? 'Choose start…'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.plannerField}
+                onPress={() => {
+                  setSearchTarget('to')
+                  setSearchOpen(true)
+                }}
+              >
+                <View style={styles.plannerDotEnd} />
+                <Text style={toEntry ? styles.plannerValue : styles.plannerPlaceholder}>
+                  {toEntry?.name ?? 'Choose destination…'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.plannerActions}>
+              <Pressable
+                onPress={() => {
+                  setFromEntry(toEntry)
+                  setToEntry(fromEntry)
+                }}
+                hitSlop={10}
+              >
+                <Feather name="repeat" size={17} color={day.ink2} />
+              </Pressable>
+              <Pressable onPress={clearPlanner} hitSlop={10}>
+                <Feather name="x" size={18} color={day.ink3} />
+              </Pressable>
+            </View>
+          </View>
+        )}
         {planning && (
           <View style={[styles.routeCard, shadow.card]}>
             <Text style={styles.routeTitle}>Planning route…</Text>
+          </View>
+        )}
+        {plannerOpen && fromEntry && toEntry && !planning && !route && (
+          <View style={[styles.routeCard, shadow.card]}>
+            <Text style={styles.routeHint}>No route found between those places</Text>
           </View>
         )}
         {!planning && routeStart && !route && (
@@ -602,8 +709,21 @@ export default function MapScreen() {
         visible={searchOpen}
         onClose={() => setSearchOpen(false)}
         onSelect={onSearchSelect}
+        placeholder={
+          searchTarget === 'from'
+            ? 'Route start: lock, mooring, place…'
+            : searchTarget === 'to'
+              ? 'Destination: lock, mooring, place…'
+              : 'Locks, moorings, pubs, stations…'
+        }
       />
 
+      <Pressable
+        style={[styles.routeButton, shadow.pill, plannerOpen && styles.routeButtonActive]}
+        onPress={() => (plannerOpen ? clearPlanner() : setPlannerOpen(true))}
+      >
+        <Feather name="corner-up-right" size={20} color={plannerOpen ? day.surface : day.ink} />
+      </Pressable>
       <Pressable style={[styles.locateButton, shadow.pill]} onPress={locateMe}>
         <Feather name="crosshair" size={20} color={day.ink} />
       </Pressable>
@@ -675,6 +795,51 @@ const styles = StyleSheet.create({
   routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   routeHint: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
+  plannerCard: {
+    backgroundColor: day.surface,
+    borderRadius: radius.card,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  plannerRows: { flex: 1, gap: 8 },
+  plannerField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 40,
+    paddingHorizontal: 12,
+    backgroundColor: day.surfaceMuted,
+    borderRadius: radius.control,
+  },
+  plannerDotStart: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: day.green,
+  },
+  plannerDotEnd: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: day.shieldRed,
+  },
+  plannerValue: { flex: 1, fontFamily: font.medium, fontSize: 14, color: day.ink },
+  plannerPlaceholder: { flex: 1, fontFamily: font.regular, fontSize: 14, color: day.ink3 },
+  plannerActions: { gap: 14, alignItems: 'center' },
+  routeButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 84,
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: day.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeButtonActive: { backgroundColor: day.green },
   chip: {
     height: 34,
     borderRadius: radius.pill,

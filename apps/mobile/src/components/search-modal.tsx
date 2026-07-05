@@ -94,16 +94,20 @@ export function SearchModal({
   visible,
   onClose,
   onSelect,
+  placeholder = 'Locks, moorings, pubs, stations…',
 }: {
   visible: boolean
   onClose: () => void
   onSelect: (entry: SearchEntry) => void
+  placeholder?: string
 }) {
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState<SearchEntry[] | null>(null)
 
   useEffect(() => {
-    if (visible && !index) {
+    if (!visible) return
+    setQuery('')
+    if (!index) {
       loadIndex()
         .then(setIndex)
         .catch(() => setIndex([]))
@@ -131,7 +135,7 @@ export function SearchModal({
           <Feather name="search" size={18} color={day.ink3} />
           <TextInput
             style={styles.input}
-            placeholder="Locks, moorings, pubs, stations…"
+            placeholder={placeholder}
             placeholderTextColor={day.ink3}
             value={query}
             onChangeText={setQuery}
