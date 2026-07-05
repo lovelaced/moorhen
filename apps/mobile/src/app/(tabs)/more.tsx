@@ -28,7 +28,7 @@ export default function MoreScreen() {
         </Text>
 
         <Link href="/downloads" asChild>
-          <Pressable style={[styles.linkRow, shadow.card]}>
+          <Pressable style={StyleSheet.flatten([styles.linkRow, shadow.card])}>
             <View style={styles.linkIcon}>
               <Feather name="download" size={18} color={day.greenDark} />
             </View>

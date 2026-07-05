@@ -580,7 +580,7 @@ export default function MapScreen() {
               minzoom={10}
               layout={{
                 'text-field': '^',
-                'text-font': ['Noto Sans Bold'],
+                'text-font': ['Noto Sans Regular'],
                 'text-size': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 22],
                 'text-rotate': ['get', 'bearingUpDeg'],
                 'text-rotation-alignment': 'map',

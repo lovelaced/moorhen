@@ -62,14 +62,21 @@ const statuses = new Map<string, RegionStatus>()
 const listeners = new Set<() => void>()
 
 function statusOf(regionId: string): RegionStatus {
-  return (
-    statuses.get(regionId) ?? {
-      downloaded: basemapFile(regionId).exists,
+  // Must return a STABLE reference between renders or useSyncExternalStore
+  // loops forever — so the initial status is created once and cached.
+  let status = statuses.get(regionId)
+  if (!status) {
+    const file = basemapFile(regionId)
+    const exists = file.exists
+    status = {
+      downloaded: exists,
       downloading: false,
       progress: 0,
-      bytes: basemapFile(regionId).exists ? (basemapFile(regionId).size ?? 0) : 0,
+      bytes: exists ? (file.size ?? 0) : 0,
     }
-  )
+    statuses.set(regionId, status)
+  }
+  return status
 }
 
 function setStatus(regionId: string, patch: Partial<RegionStatus>): void {

@@ -8,7 +8,7 @@
 import type { StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
 import { day } from '../theme'
 
-const GLYPHS = 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
+const GLYPHS = 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf'
 
 export function protomapsOfflineStyle(pmtilesFileUri: string): StyleSpecification {
   return {
