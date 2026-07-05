@@ -1049,6 +1049,7 @@ export default function MapScreen() {
               subtitle: nearest.label,
               details: [`${(nearest.distanceM / 1609.344).toFixed(1)} mi from your position`],
               coords: nearest.point,
+              ...(nearest.facilityId ? { facilityId: nearest.facilityId } : {}),
               ...(nearest.label === 'Pub' || nearest.label === 'Shop'
                 ? { hygieneLookup: { name: nearest.name, point: nearest.point } }
                 : {}),

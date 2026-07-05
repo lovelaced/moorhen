@@ -121,7 +121,7 @@ export function selectFacility(feature: GeoJSON.Feature): SelectedFeature {
     subtitle: 'Boater facility · Canal & River Trust',
     details: services.length > 0 ? [services.join(' · ')] : [],
     coords: pointOf(feature),
-    facilityId: (props['id'] as string) || undefined,
+    facilityId: typeof feature.id === 'string' ? feature.id : undefined,
   }
 }
 

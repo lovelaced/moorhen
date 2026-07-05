@@ -19,6 +19,8 @@ export interface Nearest {
   point: [number, number]
   distanceM: number
   group: 'Facilities' | 'Places'
+  /** CRT facility id — enables community status reports on the detail. */
+  facilityId?: string
 }
 
 const POI_KINDS: Array<{
@@ -105,6 +107,7 @@ async function findNearest(here: [number, number]): Promise<Nearest[]> {
           point,
           distanceM: d,
           group: 'Facilities',
+          ...(typeof f.id === 'string' ? { facilityId: f.id } : {}),
         }
       }
     }
