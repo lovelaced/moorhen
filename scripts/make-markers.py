@@ -26,16 +26,16 @@ RING = 6
 # badge name -> (MDI glyph, ring/glyph colour)
 SPEC = {
     # facilities & services
-    "water": ("water-pump", "#3D8A5A"),
+    "water": ("faucet", "#3D8A5A"),
     "elsan": ("toilet", "#3E7C8F"),
-    "pumpout": ("water-sync", "#5D5FB8"),
+    "pumpout": ("water-pump", "#5D5FB8"),
     "bins": ("trash-can-outline", "#6E6A63"),
     "shower": ("shower-head", "#3E7C8F"),
     "laundry": ("washing-machine", "#8E6FC0"),
     "facility": ("dots-horizontal", "#6E6A63"),  # multi/unknown services
     # places
     "pub": ("glass-mug-variant", "#C98A2B"),
-    "shop": ("basket", "#6E6A63"),
+    "shop": ("storefront", "#AD5D82"),
     "fuel": ("gas-station", "#B8860B"),
     "chandlery": ("hammer-wrench", "#3E7C8F"),
     "station": ("train", "#2B2B2B"),

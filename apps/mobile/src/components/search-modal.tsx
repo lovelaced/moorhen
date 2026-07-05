@@ -30,11 +30,11 @@ export interface SearchEntry {
 const KIND_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Lock: 'chevron-double-up',
   Pub: 'glass-mug-variant',
-  Shop: 'basket',
+  Shop: 'storefront',
   'Railway station': 'train',
   Mooring: 'anchor',
   Laundry: 'washing-machine',
-  'Water point': 'water-pump',
+  'Water point': 'faucet',
   'Winding hole': 'autorenew',
   Place: 'map-marker',
 }

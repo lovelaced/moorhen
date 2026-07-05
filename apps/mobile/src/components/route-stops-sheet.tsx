@@ -11,13 +11,13 @@ import { day, font, radius, shadow } from '../theme'
  */
 
 const ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  water: 'water-pump',
+  water: 'faucet',
   elsan: 'toilet',
-  pumpout: 'water-sync',
+  pumpout: 'water-pump',
   bins: 'trash-can-outline',
   shower: 'shower-head',
   pub: 'glass-mug-variant',
-  shop: 'basket',
+  shop: 'storefront',
   laundry: 'washing-machine',
   fuel: 'gas-station',
   chandlery: 'hammer-wrench',

@@ -91,12 +91,12 @@ const LAYER_CHIPS: Array<{
   icon: keyof typeof MaterialCommunityIcons.glyphMap
 }> = [
   { key: 'moorings', label: 'Moorings', icon: 'anchor' },
-  { key: 'water', label: 'Water', icon: 'water-pump' },
+  { key: 'water', label: 'Water', icon: 'faucet' },
   { key: 'elsan', label: 'Elsan', icon: 'toilet' },
-  { key: 'pumpout', label: 'Pump-out', icon: 'water-sync' },
+  { key: 'pumpout', label: 'Pump-out', icon: 'water-pump' },
   { key: 'diesel', label: 'Diesel', icon: 'gas-station' },
   { key: 'pubs', label: 'Pubs', icon: 'glass-mug-variant' },
-  { key: 'shops', label: 'Shops', icon: 'basket' },
+  { key: 'shops', label: 'Shops', icon: 'storefront' },
   { key: 'laundry', label: 'Laundry', icon: 'washing-machine' },
   { key: 'bins', label: 'Bins', icon: 'trash-can-outline' },
   { key: 'trains', label: 'Trains', icon: 'train' },
