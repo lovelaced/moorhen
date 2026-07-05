@@ -47,7 +47,21 @@ export function protomapsOfflineStyle(pmtilesFileUri: string): StyleSpecificatio
         source: 'protomaps',
         'source-layer': 'water',
         type: 'fill',
+        // the water layer also carries river/canal CENTRELINES; a fill layer
+        // would close and flood-fill those lines into giant blobs
+        filter: ['==', ['geometry-type'], 'Polygon'],
         paint: { 'fill-color': '#BFD5DE' },
+      },
+      {
+        id: 'water-lines',
+        source: 'protomaps',
+        'source-layer': 'water',
+        type: 'line',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': '#BFD5DE',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 14, 2],
+        },
       },
       {
         id: 'roads-minor',
