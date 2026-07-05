@@ -6,8 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { RouteStopsSheet } from '../../components/route-stops-sheet'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
 import { loadGraph, planRoute, type PlannedRoute } from '../../lib/route-graph'
+import { findRouteStops, type RouteStop } from '../../lib/route-stops'
 import {
   DetailSheet,
   selectFacility,
@@ -154,6 +156,8 @@ export default function MapScreen() {
   const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
   const [route, setRoute] = useState<PlannedRoute | null>(null)
   const [planning, setPlanning] = useState(false)
+  const [stops, setStops] = useState<RouteStop[] | null>(null)
+  const [stopsOpen, setStopsOpen] = useState(false)
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
   useEffect(() => {
@@ -281,6 +285,34 @@ export default function MapScreen() {
     setFromEntry(null)
     setToEntry(null)
     setRoute(null)
+  }, [])
+
+  useEffect(() => {
+    setStops(null)
+    setStopsOpen(false)
+    if (!route) return
+    let cancelled = false
+    findRouteStops(route.line)
+      .then((found) => {
+        if (!cancelled) setStops(found)
+      })
+      .catch(() => setStops(null))
+    return () => {
+      cancelled = true
+    }
+  }, [route])
+
+  const onStopSelect = useCallback((stop: RouteStop) => {
+    setStopsOpen(false)
+    cameraRef.current?.easeTo({ center: stop.point, zoom: 14.5, duration: 700 })
+    setSelected({
+      title: stop.name,
+      subtitle: stop.category,
+      details: [
+        `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route · ${Math.max(1, Math.round(stop.offsetM / 80))} min walk from the water`,
+      ],
+      coords: stop.point,
+    })
   }, [])
 
   const routeShape = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -697,6 +729,13 @@ export default function MapScreen() {
                   : ''}
                 {route.cruisingDays > 1 ? ` · ~${Math.ceil(route.cruisingDays)} cruising days` : ''}
               </Text>
+              {stops && stops.length > 0 && (
+                <Pressable onPress={() => setStopsOpen(true)}>
+                  <Text style={styles.routeStopsLink}>
+                    {stops.length} stops along the way — water, pubs, moorings…
+                  </Text>
+                </Pressable>
+              )}
             </View>
             <Pressable onPress={() => setRoute(null)} hitSlop={12}>
               <Feather name="x" size={18} color={day.ink3} />
@@ -727,6 +766,14 @@ export default function MapScreen() {
       <Pressable style={[styles.locateButton, shadow.pill]} onPress={locateMe}>
         <Feather name="crosshair" size={20} color={day.ink} />
       </Pressable>
+
+      {stopsOpen && stops && (
+        <RouteStopsSheet
+          stops={stops}
+          onSelect={onStopSelect}
+          onClose={() => setStopsOpen(false)}
+        />
+      )}
 
       {selected && <DetailSheet selected={selected} onClose={() => setSelected(null)} />}
     </View>
@@ -794,6 +841,7 @@ const styles = StyleSheet.create({
   routeText: { flex: 1, gap: 2 },
   routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
+  routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.green, marginTop: 2 },
   routeHint: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
   plannerCard: {
     backgroundColor: day.surface,

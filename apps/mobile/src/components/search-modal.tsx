@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { urls } from '../data'
+import { getLocks, getMoorings, getPois } from '../lib/artifacts'
 import { day, font, radius } from '../theme'
 
 /**
@@ -53,11 +53,7 @@ let indexPromise: Promise<SearchEntry[]> | null = null
 function loadIndex(): Promise<SearchEntry[]> {
   indexPromise ??= (async () => {
     const entries: SearchEntry[] = []
-    const [locks, pois, moorings] = await Promise.all([
-      fetch(urls.locks).then((r) => r.json()),
-      fetch(urls.pois).then((r) => r.json()),
-      fetch(urls.moorings).then((r) => r.json()),
-    ])
+    const [locks, pois, moorings] = await Promise.all([getLocks(), getPois(), getMoorings()])
     for (const f of (locks as GeoJSON.FeatureCollection).features) {
       const name = f.properties?.['name'] as string | null
       const waterway = f.properties?.['waterway'] as string | null
