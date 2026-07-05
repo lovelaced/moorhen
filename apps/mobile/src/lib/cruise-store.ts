@@ -7,6 +7,7 @@ import {
   type WaterwayGraph,
 } from '@moorhen/graph'
 import { getNotices, type NoticeRecord } from './artifacts'
+import { appendSession } from './log-store'
 import { loadGraph } from './route-graph'
 
 /**
@@ -111,6 +112,7 @@ class CruiseStore {
   private lastEdgeId: string | null = null
   private lastSnapPoint: [number, number] | null = null
   private lastAheadAt = 0
+  private startedAtMs = 0
   private stationarySince: { point: [number, number]; timestampMs: number } | null = null
   private mooredDismissedAt: [number, number] | null = null
 
@@ -138,6 +140,7 @@ class CruiseStore {
   }
 
   begin(): void {
+    this.startedAtMs = Date.now()
     this.tracker.reset()
     this.lastEdgeId = null
     this.lastSnapPoint = null
@@ -159,6 +162,15 @@ class CruiseStore {
   }
 
   end(): void {
+    // a cruise that actually went somewhere earns a log entry
+    if (this.snapshot.distanceM > 200 && this.startedAtMs > 0) {
+      appendSession({
+        startedAtMs: this.startedAtMs,
+        endedAtMs: Date.now(),
+        distanceM: this.snapshot.distanceM,
+        waterway: this.snapshot.waterway,
+      }).catch(() => {})
+    }
     this.emit({ active: false })
   }
 

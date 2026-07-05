@@ -52,7 +52,9 @@ export default function PlanScreen() {
       .then((graph) => {
         if (cancelled) return
         const budget = reachDays * hoursPerDay * 3600
-        setReach(journeyReach(graph, from.point, budget))
+        const frontier = journeyReach(graph, from.point, budget)
+        setReach(frontier)
+        plannerStore.setReach(frontier)
       })
       .catch(() => setReach(null))
     return () => {
@@ -150,6 +152,10 @@ export default function PlanScreen() {
 
         {mode === 'reach' && reach && places && (
           <>
+            <Pressable style={styles.mapButton} onPress={() => router.navigate('/')}>
+              <Feather name="map" size={15} color="#FFFFFF" />
+              <Text style={styles.mapButtonText}>Show reach on map</Text>
+            </Pressable>
             <Text style={styles.sectionTitle}>Within reach</Text>
             {dedupeReach(reach, places).map((entry) => (
               <View key={entry.name} style={styles.dayRow}>

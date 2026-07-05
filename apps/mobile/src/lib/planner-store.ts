@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import type { JourneyDay } from '@moorhen/graph'
+import type { JourneyDay, ReachPoint } from '@moorhen/graph'
 import { useSyncExternalStore } from 'react'
 import type { SearchEntry } from '../components/search-modal'
 import { loadGraph, planRoute, type PlannedRoute } from './route-graph'
@@ -18,6 +18,8 @@ export interface PlannerState {
   route: (PlannedRoute & { days: JourneyDay[] }) | null
   stops: RouteStop[] | null
   hoursPerDay: number
+  /** "How far can I get?" frontier — drawn on the map as flags. */
+  reach: ReachPoint[] | null
 }
 
 type Listener = () => void
@@ -32,6 +34,7 @@ class PlannerStore {
     route: null,
     stops: null,
     hoursPerDay: 7,
+    reach: null,
   }
   private listeners = new Set<Listener>()
   private planGeneration = 0
@@ -71,7 +74,11 @@ class PlannerStore {
 
   clear(): void {
     this.planGeneration++
-    this.patch({ from: null, to: null, route: null, stops: null, planning: false })
+    this.patch({ from: null, to: null, route: null, stops: null, planning: false, reach: null })
+  }
+
+  setReach(reach: ReachPoint[] | null): void {
+    this.patch({ reach })
   }
 
   adjustPace(delta: number): void {

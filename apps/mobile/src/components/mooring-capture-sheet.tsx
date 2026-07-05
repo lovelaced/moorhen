@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Network from 'expo-network'
 import { useCallback, useState } from 'react'
@@ -20,6 +21,8 @@ export interface MooringCapture {
   edgeType: string | null
   photoUri: string | null
   speed: SpeedResult | null
+  /** Your private 1–5 rating of the spot. */
+  stars: number | null
   savedAtMs: number
   /** User opted to publish this spot (location + edge + signal, never the photo's EXIF). */
   share: boolean
@@ -67,6 +70,7 @@ export function MooringCaptureSheet({
   const [speed, setSpeed] = useState<SpeedResult | null>(null)
   const [testing, setTesting] = useState(false)
   const [share, setShare] = useState(false)
+  const [stars, setStars] = useState<number | null>(null)
 
   const test = useCallback(async () => {
     setTesting(true)
@@ -99,6 +103,22 @@ export function MooringCaptureSheet({
         <Pressable onPress={onDismiss} hitSlop={12}>
           <Feather name="x" size={20} color={night.ink2} />
         </Pressable>
+      </View>
+
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((value) => (
+          <Pressable
+            key={value}
+            onPress={() => setStars(stars === value ? null : value)}
+            hitSlop={6}
+          >
+            <MaterialCommunityIcons
+              name={stars !== null && value <= stars ? 'star' : 'star-outline'}
+              size={26}
+              color={stars !== null && value <= stars ? '#E8B830' : night.ink2}
+            />
+          </Pressable>
+        ))}
       </View>
 
       <Text style={styles.label}>Edge</Text>
@@ -153,7 +173,9 @@ export function MooringCaptureSheet({
 
       <Pressable
         style={styles.save}
-        onPress={() => onSave({ point, edgeType, photoUri, speed, savedAtMs: Date.now(), share })}
+        onPress={() =>
+          onSave({ point, edgeType, photoUri, speed, stars, savedAtMs: Date.now(), share })
+        }
       >
         <Feather name="anchor" size={16} color="#FFFFFF" />
         <Text style={styles.saveText}>Save mooring</Text>
@@ -209,6 +231,7 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: font.semibold, fontSize: 12, color: night.ink, textAlign: 'center' },
   actionMeta: { fontFamily: font.regular, fontSize: 11, color: night.ink2 },
   thumb: { width: 28, height: 28, borderRadius: 6 },
+  starsRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
   shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
   shareText: { flex: 1, gap: 1 },
   shareTitle: { fontFamily: font.medium, fontSize: 13, color: night.ink },

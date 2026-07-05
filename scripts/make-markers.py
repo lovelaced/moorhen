@@ -43,6 +43,7 @@ SPEC = {
     "mooring": ("anchor", "#33647E"),
     "winding": ("autorenew", "#33647E"),
     "stoppage": ("alert", "#C94B33"),
+    "reach": ("flag-variant", "#3D8A5A"),
 }
 
 
@@ -86,3 +87,35 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def photo_pin() -> Image.Image:
+    """Google-style photo-pin backdrop: white teardrop — circular head that the
+    photo sits inside, pointed tail marking the exact spot."""
+    scale = 4
+    W, H = 220 * scale, 264 * scale
+    cx, cy, r = W // 2, 108 * scale, 100 * scale
+    tip_y = H - 6 * scale
+
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+
+    shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.ellipse([cx - r, cy - r + 3 * scale, cx + r, cy + r + 3 * scale], fill=(40, 36, 30, 80))
+    sd.polygon(
+        [(cx - 26 * scale, cy + r - 24 * scale), (cx + 26 * scale, cy + r - 24 * scale), (cx, tip_y)],
+        fill=(40, 36, 30, 80),
+    )
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(3 * scale)))
+
+    d = ImageDraw.Draw(img)
+    d.polygon(
+        [(cx - 26 * scale, cy + r - 24 * scale), (cx + 26 * scale, cy + r - 24 * scale), (cx, tip_y - 3 * scale)],
+        fill="#FFFFFF",
+    )
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill="#FFFFFF")
+    return img.resize((W // scale, H // scale), Image.LANCZOS)
+
+
+photo_pin().save(OUT / "photo-pin.png")
+print("photo-pin.png  <- teardrop backdrop")

@@ -7,10 +7,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { getMoorings } from '../../lib/artifacts'
+import { MooringCaptureSheet } from '../../components/mooring-capture-sheet'
+import { NearMeSheet, type Nearest } from '../../components/near-me-sheet'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
+import { shareMooring } from '../../lib/community'
 import {
   loadMoorings,
   mooringsToGeoJSON,
+  saveMooring,
   subscribeMoorings,
   type SavedMooring,
 } from '../../lib/moorings-store'
@@ -69,6 +74,8 @@ const MARKER_IMAGES = {
   winding: require('../../assets/markers/winding.png'),
   pumpout: require('../../assets/markers/pumpout.png'),
   shower: require('../../assets/markers/shower.png'),
+  reach: require('../../assets/markers/reach.png'),
+  'photo-pin': require('../../assets/markers/photo-pin.png'),
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -177,7 +184,9 @@ export default function MapScreen() {
   const [searchTarget, setSearchTarget] = useState<'place' | 'from' | 'to'>('place')
   const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
   const [stopsOpen, setStopsOpen] = useState(false)
-  const { from: fromEntry, to: toEntry, route, planning, stops, hoursPerDay } = usePlanner()
+  const [nearMeOpen, setNearMeOpen] = useState(false)
+  const [captureAt, setCaptureAt] = useState<[number, number] | null>(null)
+  const { from: fromEntry, to: toEntry, route, planning, stops, hoursPerDay, reach } = usePlanner()
   const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
@@ -215,6 +224,33 @@ export default function MapScreen() {
   }, [])
 
   const myMooringsShape = useMemo(() => mooringsToGeoJSON(myMoorings), [myMoorings])
+
+  // public moorings render as anchor badges at their midpoint, not bank lines
+  const [mooringPoints, setMooringPoints] = useState<GeoJSON.FeatureCollection>({
+    type: 'FeatureCollection',
+    features: [],
+  })
+  useEffect(() => {
+    getMoorings()
+      .then((fc: GeoJSON.FeatureCollection) => {
+        setMooringPoints({
+          type: 'FeatureCollection',
+          features: fc.features
+            .filter((f) => f.geometry.type === 'LineString')
+            .map((f) => {
+              const line = (f.geometry as GeoJSON.LineString).coordinates
+              return {
+                ...f,
+                geometry: {
+                  type: 'Point' as const,
+                  coordinates: line[Math.floor(line.length / 2)]!,
+                },
+              }
+            }),
+        })
+      })
+      .catch(() => {})
+  }, [])
   const mooringPhotos = useMemo(() => {
     const images: Record<string, string> = {}
     for (const mooring of myMoorings) {
@@ -278,6 +314,19 @@ export default function MapScreen() {
       setSelected({ title: entry.name, subtitle: entry.kind, details: [], coords: entry.point })
     },
     [searchTarget],
+  )
+
+  const reachShape = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: 'FeatureCollection',
+      features: (reach ?? []).map((point, i) => ({
+        type: 'Feature' as const,
+        id: i,
+        geometry: { type: 'Point' as const, coordinates: point.point as [number, number] },
+        properties: { distanceM: Math.round(point.distanceM) },
+      })),
+    }),
+    [reach],
   )
 
   // fit the camera when a route lands (planning happens in the store)
@@ -371,6 +420,36 @@ export default function MapScreen() {
     [active],
   )
 
+  // The badge shows what the facility offers — but a multi-service block must
+  // wear the icon of a service you're actually filtering on, or toggling
+  // "Bins" appears to surface water taps. Active services first, then the
+  // rest in the usual priority order.
+  const facilityIcon = useMemo(() => {
+    const clauses: unknown[] = ['case']
+    const branch = (services: string[], icon: string) => {
+      clauses.push(
+        services.length === 1
+          ? ['==', ['get', services[0]], true]
+          : ['any', ...services.map((svc) => ['==', ['get', svc], true])],
+        icon,
+      )
+    }
+    const order: Array<[ChipKey, string[], string]> = [
+      ['elsan', ['elsan'], 'elsan'],
+      ['pumpout', ['pumpOutUserOperated', 'pumpOutStaffOperated'], 'pumpout'],
+      ['water', ['water'], 'water'],
+      ['bins', ['refuse', 'recycling'], 'bins'],
+      ['laundry', ['washingMachine', 'tumbleDryer'], 'laundry'],
+    ]
+    for (const [chip, services, icon] of order) {
+      if (active.has(chip)) branch(services, icon)
+    }
+    for (const [, services, icon] of order) branch(services, icon)
+    branch(['shower'], 'shower')
+    clauses.push('facility')
+    return clauses
+  }, [active])
+
   // Prefer a downloaded offline basemap over the hosted style when one exists.
   const offlineStyle = useMemo(() => {
     for (const region of REGION_BOUNDS) {
@@ -457,19 +536,19 @@ export default function MapScreen() {
 
           <MapLibre.GeoJSONSource
             id="moorings"
-            data={urls.moorings}
+            data={mooringPoints}
             onPress={onFeaturePress(selectMooring)}
           >
             <MapLibre.Layer
-              type="line"
-              id="mooring-lines"
+              type="symbol"
+              id="mooring-badges"
               minzoom={10}
               filter={['==', ['get', 'access'], 'public']}
-              layout={{ visibility: active.has('moorings') ? 'visible' : 'none' }}
-              paint={{
-                'line-color': day.green,
-                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 8],
-                'line-opacity': 0.85,
+              layout={{
+                visibility: active.has('moorings') ? 'visible' : 'none',
+                'icon-image': 'mooring',
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.28, 14, 0.55],
+                'icon-allow-overlap': false,
               }}
             />
           </MapLibre.GeoJSONSource>
@@ -492,31 +571,7 @@ export default function MapScreen() {
                   : ['==', ['get', 'name'], '__none__']
               }
               layout={{
-                // the badge shows what the facility actually offers
-                'icon-image': [
-                  'case',
-                  ['==', ['get', 'elsan'], true],
-                  'elsan',
-                  [
-                    'any',
-                    ['==', ['get', 'pumpOutUserOperated'], true],
-                    ['==', ['get', 'pumpOutStaffOperated'], true],
-                  ],
-                  'pumpout',
-                  ['==', ['get', 'water'], true],
-                  'water',
-                  ['any', ['==', ['get', 'refuse'], true], ['==', ['get', 'recycling'], true]],
-                  'bins',
-                  ['==', ['get', 'shower'], true],
-                  'shower',
-                  [
-                    'any',
-                    ['==', ['get', 'washingMachine'], true],
-                    ['==', ['get', 'tumbleDryer'], true],
-                  ],
-                  'laundry',
-                  'facility',
-                ],
+                'icon-image': facilityIcon as unknown as string,
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.28, 14, 0.55],
                 'icon-allow-overlap': true,
               }}
@@ -630,16 +685,16 @@ export default function MapScreen() {
                 })
               }}
             >
-              {/* photo pins grow with zoom, Google featured-place style */}
+              {/* photo pins: white teardrop with the photo in the head, tip on the spot */}
               <MapLibre.Layer
-                type="circle"
-                id="my-mooring-ring"
+                type="symbol"
+                id="my-mooring-pin-bg"
                 filter={['==', ['get', 'hasPhoto'], true]}
-                paint={{
-                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 16, 26],
-                  'circle-color': '#FFFFFF',
-                  'circle-stroke-color': day.shieldRed,
-                  'circle-stroke-width': 3,
+                layout={{
+                  'icon-image': 'photo-pin',
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.16, 16, 0.42],
+                  'icon-anchor': 'bottom',
+                  'icon-allow-overlap': true,
                 }}
               />
               <MapLibre.Layer
@@ -648,7 +703,9 @@ export default function MapScreen() {
                 filter={['==', ['get', 'hasPhoto'], true]}
                 layout={{
                   'icon-image': ['concat', 'photo-', ['get', 'id']],
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.075, 16, 0.25],
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.147, 16, 0.386],
+                  'icon-anchor': 'bottom',
+                  'icon-offset': [0, -61],
                   'icon-allow-overlap': true,
                 }}
               />
@@ -659,6 +716,37 @@ export default function MapScreen() {
                 layout={{
                   'icon-image': 'mooring',
                   'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 15, 0.4],
+                  'icon-allow-overlap': true,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
+
+          {reach && reach.length > 0 && (
+            <MapLibre.GeoJSONSource
+              id="reach"
+              data={reachShape}
+              onPress={(event: FeaturePress) => {
+                const f = event.nativeEvent.features[0]
+                if (!f) return
+                event.stopPropagation()
+                const pt = (f.geometry as GeoJSON.Point).coordinates as [number, number]
+                const miles =
+                  Number((f.properties as Record<string, unknown>)?.['distanceM']) / 1609.344
+                setSelected({
+                  title: 'As far as you can get',
+                  subtitle: 'Reach frontier',
+                  details: [`${miles.toFixed(1)} mi of cruising from your start`],
+                  coords: pt,
+                })
+              }}
+            >
+              <MapLibre.Layer
+                type="symbol"
+                id="reach-flags"
+                layout={{
+                  'icon-image': 'reach',
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 6, 0.3, 12, 0.5],
                   'icon-allow-overlap': true,
                 }}
               />
@@ -735,9 +823,15 @@ export default function MapScreen() {
             <Feather name="search" size={18} color={day.ink3} />
             <Text style={styles.searchText}>Search locks, moorings, places…</Text>
           </Pressable>
-          <View style={[styles.roundButton, shadow.pill]}>
-            <Feather name="layers" size={20} color={day.ink} />
-          </View>
+          <Pressable
+            style={[styles.roundButton, shadow.pill]}
+            onPress={() => {
+              setSelected(null)
+              setNearMeOpen(true)
+            }}
+          >
+            <MaterialCommunityIcons name="map-marker-radius" size={20} color={day.ink} />
+          </Pressable>
         </View>
 
         <ScrollView
@@ -896,6 +990,23 @@ export default function MapScreen() {
       />
 
       <Pressable
+        style={[styles.captureButton, shadow.pill]}
+        onPress={async () => {
+          const permission = await Location.requestForegroundPermissionsAsync()
+          if (!permission.granted) return
+          const position =
+            (await Location.getLastKnownPositionAsync()) ??
+            (await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }).catch(() => null))
+          if (!position) return
+          setSelected(null)
+          setCaptureAt([position.coords.longitude, position.coords.latitude])
+        }}
+      >
+        <MaterialCommunityIcons name="anchor" size={20} color={day.surface} />
+      </Pressable>
+      <Pressable
         style={[styles.routeButton, shadow.pill, plannerOpen && styles.routeButtonActive]}
         onPress={() => (plannerOpen ? clearPlanner() : setPlannerOpen(true))}
       >
@@ -925,6 +1036,37 @@ export default function MapScreen() {
             onClose={() => setStopsOpen(false)}
           />
         </Animated.View>
+      )}
+
+      {nearMeOpen && !selected && (
+        <NearMeSheet
+          onClose={() => setNearMeOpen(false)}
+          onSelect={(nearest: Nearest) => {
+            setNearMeOpen(false)
+            cameraRef.current?.easeTo({ center: nearest.point, zoom: 14.5, duration: 700 })
+            setSelected({
+              title: nearest.name,
+              subtitle: nearest.label,
+              details: [`${(nearest.distanceM / 1609.344).toFixed(1)} mi from your position`],
+              coords: nearest.point,
+              ...(nearest.label === 'Pub' || nearest.label === 'Shop'
+                ? { hygieneLookup: { name: nearest.name, point: nearest.point } }
+                : {}),
+            })
+          }}
+        />
+      )}
+
+      {captureAt && (
+        <MooringCaptureSheet
+          point={captureAt}
+          onSave={(capture) => {
+            void saveMooring(capture)
+            if (capture.share) shareMooring(capture).catch(() => {})
+            setCaptureAt(null)
+          }}
+          onDismiss={() => setCaptureAt(null)}
+        />
       )}
 
       {selected && <DetailSheet selected={selected} onClose={() => setSelected(null)} />}
@@ -1050,6 +1192,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   routeButtonActive: { backgroundColor: day.green },
+  captureButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 144,
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: day.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chip: {
     height: 34,
     borderRadius: radius.pill,

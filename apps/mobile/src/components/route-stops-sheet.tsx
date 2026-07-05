@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useMemo, useState } from 'react'
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { RouteStop } from '../lib/route-stops'
 import { day, font, radius, shadow } from '../theme'
 
@@ -9,6 +9,20 @@ import { day, font, radius, shadow } from '../theme'
  * Stops along the planned route, in journey order. Everything listed is
  * within a ~10 minute walk of the water.
  */
+
+/** Everything en route is either a boater facility or a place ashore. */
+const FACILITY_ICON_KEYS = new Set([
+  'water',
+  'elsan',
+  'pumpout',
+  'bins',
+  'shower',
+  'facility',
+  'mooring',
+  'fuel',
+])
+const groupOf = (iconKey: string): 'Facilities' | 'Places' =>
+  FACILITY_ICON_KEYS.has(iconKey) ? 'Facilities' : 'Places'
 
 const ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   water: 'faucet',
@@ -48,6 +62,18 @@ export function RouteStopsSheet({
     [stops, filter],
   )
 
+  // grouped: facilities first (journey order preserved within each group)
+  const listData = useMemo(() => {
+    const rows: Array<{ header: string } | RouteStop> = []
+    for (const group of ['Facilities', 'Places'] as const) {
+      const members = visible.filter((stop) => groupOf(stop.icon) === group)
+      if (members.length === 0) continue
+      rows.push({ header: group })
+      rows.push(...members)
+    }
+    return rows
+  }, [visible])
+
   return (
     <View style={[styles.sheet, shadow.card]}>
       <View style={styles.header}>
@@ -59,12 +85,7 @@ export function RouteStopsSheet({
       <Text style={styles.subtitle}>
         {visible.length} canalside place{visible.length === 1 ? '' : 's'} along your route
       </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        contentContainerStyle={styles.filterContent}
-      >
+      <View style={styles.filterWrap}>
         <Pressable
           onPress={() => setFilter(null)}
           style={[styles.filterChip, filter === null && styles.filterChipActive]}
@@ -82,31 +103,35 @@ export function RouteStopsSheet({
             </Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </View>
       <FlatList
-        data={visible}
-        keyExtractor={(stop, i) => `${stop.name}-${i}`}
+        data={listData}
+        keyExtractor={(row, i) => ('header' in row ? row.header : `${row.name}-${i}`)}
         style={styles.list}
-        renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => onSelect(item)}>
-            <View style={styles.rowIcon}>
-              <MaterialCommunityIcons
-                name={ICONS[item.icon] ?? 'map-marker'}
-                size={16}
-                color={day.greenDark}
-              />
-            </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.rowMeta}>
-                {item.category} · mile {(item.chainageM / 1609.344).toFixed(1)} ·{' '}
-                {Math.max(1, Math.round(item.offsetM / 80))} min walk
-              </Text>
-            </View>
-          </Pressable>
-        )}
+        renderItem={({ item }) =>
+          'header' in item ? (
+            <Text style={styles.groupHeader}>{item.header}</Text>
+          ) : (
+            <Pressable style={styles.row} onPress={() => onSelect(item)}>
+              <View style={styles.rowIcon}>
+                <MaterialCommunityIcons
+                  name={ICONS[item.icon] ?? 'map-marker'}
+                  size={16}
+                  color={day.greenDark}
+                />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.rowMeta}>
+                  {item.category} · mile {(item.chainageM / 1609.344).toFixed(1)} ·{' '}
+                  {Math.max(1, Math.round(item.offsetM / 80))} min walk
+                </Text>
+              </View>
+            </Pressable>
+          )
+        }
       />
     </View>
   )
@@ -128,8 +153,16 @@ const styles = StyleSheet.create({
   title: { fontFamily: font.semibold, fontSize: 17, color: day.ink, letterSpacing: -0.2 },
   subtitle: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   list: { marginTop: 6 },
-  filterRow: { flexGrow: 0, marginTop: 4 },
-  filterContent: { gap: 6, paddingRight: 8 },
+  filterWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  groupHeader: {
+    fontFamily: font.semibold,
+    fontSize: 12,
+    color: day.ink3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 10,
+    marginBottom: 2,
+  },
   filterChip: {
     height: 30,
     borderRadius: radius.pill,
