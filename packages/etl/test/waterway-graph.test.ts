@@ -157,3 +157,27 @@ describe('planJourney with exact per-chamber lock counting', () => {
     }
   })
 })
+
+describe('stoppageAhead — direction-aware', () => {
+  it('flags a closure ahead in the travel direction, ignores the one behind', async () => {
+    const { snapToNetwork, stoppageAhead } = await import('@moorhen/graph')
+    // On the Grand Union west of Braunston, heading east (up the flight).
+    const snap = snapToNetwork(graph, [-1.19, 52.283])
+    expect(snap).not.toBeNull()
+    const toB = snap!.edge.geometry[snap!.edge.geometry.length - 1]!
+    // direction that points towards the edge's b vertex
+    const eastIsB = toB[0] > snap!.edge.geometry[0]![0]
+    const forward: 1 | -1 = eastIsB ? 1 : -1
+
+    const ahead = { id: 'ahead', point: [-1.15, 52.29] as [number, number] } // up towards the tunnel
+    const behind = { id: 'behind', point: [-1.24, 52.277] as [number, number] } // back towards Napton
+
+    const result = stoppageAhead(graph, snap!, forward, [ahead, behind])
+    expect(result).not.toBeNull()
+    expect(result!.stoppage.id).toBe('ahead')
+
+    // reverse the boat: now only the one behind is "ahead"
+    const reversed = stoppageAhead(graph, snap!, (forward * -1) as 1 | -1, [ahead, behind])
+    expect(reversed?.stoppage.id).toBe('behind')
+  })
+})
