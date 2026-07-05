@@ -1,4 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import Feather from '@expo/vector-icons/Feather'
+import { Link } from 'expo-router'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { day, font, radius, shadow } from '../../theme'
 
@@ -24,6 +26,19 @@ export default function MoreScreen() {
         <Text style={styles.tagline}>
           Free forever, ad-free forever, open source (GPL-3.0). Built by boaters, for boaters.
         </Text>
+
+        <Link href="/downloads" asChild>
+          <Pressable style={[styles.linkRow, shadow.card]}>
+            <View style={styles.linkIcon}>
+              <Feather name="download" size={18} color={day.greenDark} />
+            </View>
+            <View style={styles.linkText}>
+              <Text style={styles.linkTitle}>Offline maps</Text>
+              <Text style={styles.linkMeta}>Download your region for no-signal cruising</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={day.ink3} />
+          </Pressable>
+        </Link>
 
         <View style={[styles.card, shadow.card]}>
           <Text style={styles.sectionTitle}>Data sources & thanks</Text>
@@ -58,5 +73,24 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: day.ink },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: day.surface,
+    borderRadius: radius.card,
+    padding: 16,
+  },
+  linkIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    backgroundColor: day.greenSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkText: { flex: 1, gap: 2 },
+  linkTitle: { fontFamily: font.semibold, fontSize: 15, color: day.ink },
+  linkMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   attribution: { fontFamily: font.regular, fontSize: 12, color: day.ink2, lineHeight: 18 },
 })

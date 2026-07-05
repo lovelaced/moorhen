@@ -33,10 +33,12 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
-          headerShown: false,
           contentStyle: { backgroundColor: day.bg },
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="downloads" options={{ headerShown: true }} />
+      </Stack>
     </>
   )
 }

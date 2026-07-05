@@ -27,6 +27,9 @@ import {
   type SelectedFeature,
 } from '../../components/detail-sheet'
 import { urls } from '../../data'
+import { basemapUri } from '../../lib/offline'
+import { REGION_BOUNDS } from '../../lib/regions'
+import { protomapsOfflineStyle } from '../../lib/protomaps-style'
 import { day, font, radius, shadow } from '../../theme'
 
 /**
@@ -378,12 +381,21 @@ export default function MapScreen() {
     [active],
   )
 
+  // Prefer a downloaded offline basemap over the hosted style when one exists.
+  const offlineStyle = useMemo(() => {
+    for (const region of REGION_BOUNDS) {
+      const uri = basemapUri(region.id)
+      if (uri) return protomapsOfflineStyle(uri)
+    }
+    return null
+  }, [])
+
   return (
     <View style={styles.root}>
       {MapLibre ? (
         <MapLibre.Map
           style={StyleSheet.absoluteFill}
-          mapStyle="https://tiles.openfreemap.org/styles/liberty"
+          mapStyle={offlineStyle ?? 'https://tiles.openfreemap.org/styles/liberty'}
           onPress={() => setSelected(null)}
           onLongPress={onLongPress}
           compass={true}

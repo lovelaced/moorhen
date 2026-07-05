@@ -25,6 +25,7 @@ import { extractLocks } from '../locks'
 import { extractDerelictCanals, extractMoorings } from '../moorings'
 import { buildNetworkIndex, extractPois } from '../pois'
 import { buildOverlayTiles, corridorFromGraph, writeCorridor } from '../tiles'
+import { REGIONS, corridorCellKeys, regionCorridor } from '../regions'
 
 interface Args {
   pbf: string
@@ -181,6 +182,38 @@ async function main(): Promise<void> {
     // corridor polygon (clips the offline basemap download) + overlay tiles
     const corridorPath = await writeCorridor(args.out, corridorFromGraph(graph))
     console.log(`[tiles] corridor polygon → ${corridorPath}`)
+
+    // per-region corridor polygons + a regions manifest (network km per region)
+    const cellKeys = corridorCellKeys(graph.edges.map((e) => e.geometry))
+    const regionEntries = []
+    for (const region of REGIONS) {
+      const corridor = regionCorridor(region, cellKeys)
+      if (corridor.coordinates.length === 0) continue
+      await writeFile(
+        join(args.out, `region-${region.id}.geojson`),
+        JSON.stringify({ type: 'Feature', properties: { id: region.id }, geometry: corridor }),
+      )
+      const km = graph.edges
+        .filter((e) => {
+          const mid = e.geometry[Math.floor(e.geometry.length / 2)]!
+          const [w, s2, e2, n] = region.bounds
+          return mid[0] >= w && mid[0] <= e2 && mid[1] >= s2 && mid[1] <= n
+        })
+        .reduce((sum, e) => sum + e.lengthM, 0)
+      regionEntries.push({
+        id: region.id,
+        name: region.name,
+        bounds: region.bounds,
+        cells: corridor.coordinates.length,
+        networkKm: Math.round(km / 1000),
+      })
+    }
+    await writeFile(
+      join(args.out, 'regions.json'),
+      JSON.stringify({ regions: regionEntries }, null, 2),
+    )
+    console.log(`[tiles] ${regionEntries.length} regions → regions.json`)
+    manifest['regions'] = regionEntries.length
     const overlay = await buildOverlayTiles({ artifactsDir: args.out })
     if (overlay) console.log(`[tiles] overlay tiles → ${overlay}`)
     else console.warn('[tiles] tippecanoe not installed — skipped overlay.pmtiles')

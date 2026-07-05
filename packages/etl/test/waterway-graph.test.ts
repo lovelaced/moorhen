@@ -181,3 +181,21 @@ describe('stoppageAhead — direction-aware', () => {
     expect(reversed?.stoppage.id).toBe('behind')
   })
 })
+
+describe('offline regions', () => {
+  it('assigns network edges to sensible regions and builds region corridors', async () => {
+    const { regionOf, corridorCellKeys, regionCorridor, REGIONS } = await import('@moorhen/etl')
+    // Braunston is in the Midlands
+    const midlands = regionOf([-1.21, 52.29])
+    expect(midlands?.id).toBe('midlands')
+
+    const keys = corridorCellKeys(graph.edges.map((e) => e.geometry))
+    const midlandsDef = REGIONS.find((r) => r.id === 'midlands')!
+    const corridor = regionCorridor(midlandsDef, keys)
+    expect(corridor.type).toBe('MultiPolygon')
+    expect(corridor.coordinates.length).toBeGreaterThan(0)
+
+    // a point in the sea belongs to no region
+    expect(regionOf([-8, 55])).toBeNull()
+  })
+})
