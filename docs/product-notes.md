@@ -56,3 +56,14 @@ auto-log location without the user tapping the notification (privacy principle).
   facility closures made laundrettes acute).
 - ETL: OSM shops/pubs/fuel/chandlery/laundry extracted from nodes AND building
   ways (centroids), clipped to the canal corridor so the POI artifact stays lean.
+
+## Cruise mode verification note (owner build session)
+
+Background tracking (foreground-location service) and the task-manager crash
+fix (RECEIVE_BOOT_COMPLETED) are verified on-device: the FGS runs
+(`isForeground=true`, type LOCATION, green notification) and the app no longer
+crashes on background fixes. The direction-aware stoppage matching is a graph
+golden test. The **moored-up → capture-sheet** flow can't be exercised on the
+Android emulator: `adb emu geo fix` won't deliver a repeated identical fix
+(distanceInterval gate), and stationary detection needs periodic fixes that
+only real GPS jitter provides. Verify on a real device (a slow walk works).
