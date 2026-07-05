@@ -226,3 +226,36 @@ end $$;
 rollback;
 
 \echo 'ALL RLS TESTS PASSED'
+
+\echo '-- scenario: contributed hours land pending, publish after moderation'
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+begin;
+select set_config('role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', true);
+insert into public.place_edits (place_id, field, value, lon, lat, author)
+  values ('osm:123', 'opening_hours', 'Mo-Su 12:00-23:00', -1.2, 52.3, '00000000-0000-0000-0000-00000000000a');
+do $$
+begin
+  if (select status from public.place_edits limit 1) <> 'pending' then
+    raise exception 'new-user edit should be pending';
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', true);
+do $$
+begin
+  if (select count(*) from public.place_edits) <> 0 then
+    raise exception 'pending edit leaked';
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', true);
+update public.place_edits set status = 'published';
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', true);
+do $$
+begin
+  if (select count(*) from public.place_edits) <> 1 then
+    raise exception 'published edit should be visible';
+  end if;
+end $$;
+rollback;
+
+\echo 'ALL 0002 TESTS PASSED'

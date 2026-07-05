@@ -8,15 +8,17 @@ import type { NativeSyntheticEvent } from 'react-native'
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMoorings } from '../../lib/artifacts'
-import { MooringCaptureSheet } from '../../components/mooring-capture-sheet'
+import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
 import { NearMeSheet, type Nearest } from '../../components/near-me-sheet'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
 import { shareMooring } from '../../lib/community'
 import {
+  deleteMooring,
   loadMoorings,
   mooringsToGeoJSON,
   saveMooring,
   subscribeMoorings,
+  updateMooring,
   type SavedMooring,
 } from '../../lib/moorings-store'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
@@ -673,6 +675,7 @@ export default function MapScreen() {
                 event.stopPropagation()
                 const pt = (f.geometry as GeoJSON.Point).coordinates as [number, number]
                 const props = (f.properties ?? {}) as Record<string, unknown>
+                const mooringId = String(props['id'] ?? '')
                 const details: string[] = ['Your private mooring']
                 if (props['edgeType']) details.push(`Edge: ${String(props['edgeType'])}`)
                 if (props['downMbps'])
@@ -682,6 +685,60 @@ export default function MapScreen() {
                   subtitle: 'Only visible to you',
                   details,
                   coords: pt,
+                  actions: [
+                    {
+                      label: 'Retest signal',
+                      onPress: async () => {
+                        const position =
+                          (await Location.getLastKnownPositionAsync()) ??
+                          (await Location.getCurrentPositionAsync({
+                            accuracy: Location.Accuracy.Balanced,
+                          }).catch(() => null))
+                        if (!position) return
+                        const dLat = (position.coords.latitude - pt[1]) * 111_320
+                        const dLon =
+                          (position.coords.longitude - pt[0]) *
+                          111_320 *
+                          Math.cos((pt[1] * Math.PI) / 180)
+                        if (Math.hypot(dLat, dLon) > 250) {
+                          setSelected((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  details: [...details, 'Get within 250 m of the spot to retest'],
+                                }
+                              : current,
+                          )
+                          return
+                        }
+                        const speed = await runSpeedTest().catch(() => null)
+                        if (!speed) return
+                        void updateMooring(mooringId, { speed })
+                        setSelected((current) =>
+                          current
+                            ? {
+                                ...current,
+                                details: [
+                                  'Your private mooring',
+                                  ...(props['edgeType']
+                                    ? [`Edge: ${String(props['edgeType'])}`]
+                                    : []),
+                                  `Signal: ${speed.downMbps.toFixed(1)} Mbps (just now)`,
+                                ],
+                              }
+                            : current,
+                        )
+                      },
+                    },
+                    {
+                      label: 'Delete',
+                      destructive: true,
+                      onPress: () => {
+                        void deleteMooring(mooringId)
+                        setSelected(null)
+                      },
+                    },
+                  ],
                 })
               }}
             >
@@ -717,6 +774,33 @@ export default function MapScreen() {
                   'icon-image': 'mooring',
                   'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 15, 0.4],
                   'icon-allow-overlap': true,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
+
+          {selected && (
+            <MapLibre.GeoJSONSource
+              id="selected-highlight"
+              data={{
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: selected.coords },
+                    properties: {},
+                  },
+                ],
+              }}
+            >
+              <MapLibre.Layer
+                type="circle"
+                id="selected-ring"
+                paint={{
+                  'circle-radius': 13,
+                  'circle-color': 'rgba(61, 138, 90, 0.15)',
+                  'circle-stroke-color': day.green,
+                  'circle-stroke-width': 2.5,
                 }}
               />
             </MapLibre.GeoJSONSource>
@@ -845,10 +929,16 @@ export default function MapScreen() {
               <Pressable
                 key={chip.key}
                 onPress={() => toggleChip(chip.key)}
-                style={[styles.chip, shadow.pill, isActive && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  shadow.pill,
+                  chip.key === 'canalside' && styles.chipMeta,
+                  isActive &&
+                    (chip.key === 'canalside' ? styles.chipMetaActive : styles.chipActive),
+                ]}
               >
                 <MaterialCommunityIcons
-                  name={chip.icon}
+                  name={chip.key === 'canalside' ? 'filter-variant' : chip.icon}
                   size={15}
                   color={isActive ? day.surface : day.ink2}
                 />
@@ -1214,6 +1304,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chipActive: { backgroundColor: day.green },
+  chipMeta: { borderWidth: 1.5, borderColor: day.ink3, backgroundColor: day.bg },
+  chipMetaActive: { backgroundColor: day.ink, borderColor: day.ink },
   chipLabel: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
   chipLabelActive: { fontFamily: font.semibold, color: day.surface },
 })

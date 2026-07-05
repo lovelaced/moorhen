@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { MooringCapture } from '../components/mooring-capture-sheet'
+import { appendSession } from './log-store'
 
 /**
  * The boater's own moorings — stored on the device, never uploaded unless the
@@ -45,7 +46,22 @@ export async function saveMooring(capture: MooringCapture): Promise<SavedMooring
   cache = [mooring, ...list]
   await AsyncStorage.setItem(KEY, JSON.stringify(cache))
   emit()
+  // a logged mooring is a log entry too
+  appendSession({
+    kind: 'mooring',
+    startedAtMs: capture.savedAtMs,
+    endedAtMs: capture.savedAtMs,
+    distanceM: 0,
+    waterway: null,
+  }).catch(() => {})
   return mooring
+}
+
+export async function updateMooring(id: string, patch: Partial<MooringCapture>): Promise<void> {
+  const list = await loadMoorings()
+  cache = list.map((mooring) => (mooring.id === id ? { ...mooring, ...patch } : mooring))
+  await AsyncStorage.setItem(KEY, JSON.stringify(cache))
+  emit()
 }
 
 export async function deleteMooring(id: string): Promise<void> {

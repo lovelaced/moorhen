@@ -28,7 +28,7 @@ export interface MooringCapture {
   share: boolean
 }
 
-interface SpeedResult {
+export interface SpeedResult {
   downMbps: number
   latencyMs: number
   networkType: string
@@ -39,7 +39,7 @@ interface SpeedResult {
 const SPEED_URL = 'https://speed.cloudflare.com/__down?bytes=2000000'
 const SPEED_BYTES = 2_000_000
 
-async function runSpeedTest(): Promise<SpeedResult> {
+export async function runSpeedTest(): Promise<SpeedResult> {
   const networkState = await Network.getNetworkStateAsync()
   const networkType = String(networkState.type ?? 'unknown').toLowerCase()
 

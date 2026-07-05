@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useEffect, useRef, useState } from 'react'
 import * as Linking from 'expo-linking'
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import {
   communityConfigured,
   fetchFacilityReports,
@@ -9,6 +9,14 @@ import {
   type CommunityReport,
   type FacilityStatus,
 } from '../lib/community'
+import {
+  addMooringPhoto,
+  fetchContributedHours,
+  fetchMooringCommunity,
+  submitHours,
+  type MooringCommunity,
+} from '../lib/community'
+import { formatOpeningHours } from '../lib/format-hours'
 import { fetchHygieneRating, type HygieneRating } from '../lib/hygiene'
 import { day, font, radius, shadow } from '../theme'
 
@@ -29,6 +37,12 @@ export interface SelectedFeature {
   facilityId?: string
   /** Set for pubs/shops: look up the FSA food-hygiene rating live. */
   hygieneLookup?: { name: string; point: [number, number] }
+  /** Extra buttons (delete a private mooring, retest signal…). */
+  actions?: Array<{ label: string; destructive?: boolean; onPress: () => void }>
+  /** Public mooring key — enables community photos/stars. */
+  mooringKey?: { key: string; point: [number, number] }
+  /** Place id + point — enables "suggest opening hours". */
+  placeEdit?: { placeId: string; point: [number, number]; name: string }
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -95,19 +109,24 @@ export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const rawCategory = String(props['category'])
   const category = CATEGORY_LABELS[rawCategory] ?? 'Place'
-  const hours = typeof props['hours'] === 'string' ? `Hours: ${props['hours']}` : null
+  const hours =
+    typeof props['hours'] === 'string' ? formatOpeningHours(props['hours']).join('\n') : null
   const details = [walkNote(props), pubMooringNote(props), hours].filter(
     (line): line is string => line !== null,
   )
   const coords = pointOf(feature)
   const name = (props['name'] as string) || category
   const wantsHygiene = (rawCategory === 'pub' || rawCategory === 'shop') && !!props['name']
+  const editable = rawCategory === 'pub' || rawCategory === 'shop'
   return {
     title: name,
     subtitle: `${category} · OpenStreetMap`,
     details,
     coords,
     ...(wantsHygiene ? { hygieneLookup: { name, point: coords } } : {}),
+    ...(editable && feature.id !== undefined
+      ? { placeEdit: { placeId: `osm:${feature.id}`, point: coords, name } }
+      : {}),
   }
 }
 
@@ -146,11 +165,15 @@ export function selectMooring(feature: GeoJSON.Feature): SelectedFeature {
       : 'Edge type unknown — help confirm (rings / armco / pins)',
   )
   if (props['maxStay']) details.push(`Max stay ${String(props['maxStay'])}`)
+  const coords = pointOf(feature)
   return {
     title: (props['name'] as string) || 'Mooring',
     subtitle: access === 'public' ? 'Visitor mooring · OpenStreetMap' : `Mooring (${access})`,
     details,
-    coords: pointOf(feature),
+    coords,
+    ...(access === 'public' && feature.id !== undefined
+      ? { mooringKey: { key: `osm:${feature.id}`, point: coords } }
+      : {}),
   }
 }
 
@@ -255,6 +278,132 @@ function HygieneRow({ lookup }: { lookup: { name: string; point: [number, number
   )
 }
 
+function MooringCommunityBlock({ mooring }: { mooring: { key: string; point: [number, number] } }) {
+  const [info, setInfo] = useState<MooringCommunity | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [thanks, setThanks] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMooringCommunity(mooring.key).then((found) => {
+      if (!cancelled) setInfo(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [mooring.key])
+
+  if (!communityConfigured()) return null
+
+  const addPhoto = async () => {
+    const ImagePicker = await import('expo-image-picker')
+    const permission = await ImagePicker.requestCameraPermissionsAsync()
+    if (!permission.granted) return
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.6, exif: false })
+    if (result.canceled || !result.assets[0]) return
+    setBusy(true)
+    try {
+      await addMooringPhoto(mooring.key, mooring.point, result.assets[0].uri)
+      setThanks(true)
+      setInfo(await fetchMooringCommunity(mooring.key))
+    } catch {
+      // best-effort
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <View style={styles.community}>
+      {info?.avgStars != null && (
+        <Text style={styles.communityLatest}>
+          {'★'.repeat(Math.round(info.avgStars))} {info.avgStars.toFixed(1)} · {info.reviewCount}{' '}
+          boater{info.reviewCount === 1 ? '' : 's'}
+        </Text>
+      )}
+      {info && info.photoUrls.length > 0 && (
+        <Image source={{ uri: info.photoUrls[0] }} style={styles.communityPhoto} />
+      )}
+      {thanks ? (
+        <Text style={styles.communityThanks}>Photo shared — thanks!</Text>
+      ) : (
+        <Pressable style={styles.communityButton} onPress={addPhoto} disabled={busy}>
+          <Feather name="camera" size={14} color={day.greenDark} />
+          <Text style={styles.communityButtonText}>{busy ? 'Uploading…' : 'Add a photo'}</Text>
+        </Pressable>
+      )}
+    </View>
+  )
+}
+
+function SuggestHoursBlock({
+  place,
+}: {
+  place: { placeId: string; point: [number, number]; name: string }
+}) {
+  const [contributed, setContributed] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  const [sent, setSent] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchContributedHours(place.placeId).then((found) => {
+      if (!cancelled) setContributed(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [place.placeId])
+
+  if (!communityConfigured()) return null
+
+  const submit = async () => {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    try {
+      await submitHours(place.placeId, place.point, trimmed)
+      setSent(true)
+      setEditing(false)
+    } catch {
+      setEditing(false)
+    }
+  }
+
+  return (
+    <View style={styles.community}>
+      {contributed && (
+        <Text style={styles.communityLatest}>
+          Hours (boater-reported): {formatOpeningHours(contributed).join(' · ')}
+        </Text>
+      )}
+      {sent ? (
+        <Text style={styles.communityThanks}>Hours suggested — thanks!</Text>
+      ) : editing ? (
+        <View style={styles.hoursEditRow}>
+          <TextInput
+            style={styles.hoursInput}
+            placeholder="e.g. Mon–Fri 12:00–23:00, Sat–Sun 10:00–00:00"
+            placeholderTextColor={day.ink3}
+            value={value}
+            onChangeText={setValue}
+            autoFocus
+          />
+          <Pressable style={styles.communityButton} onPress={submit}>
+            <Feather name="check" size={14} color={day.greenDark} />
+            <Text style={styles.communityButtonText}>Send</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable style={styles.communityButton} onPress={() => setEditing(true)}>
+          <Feather name="clock" size={14} color={day.greenDark} />
+          <Text style={styles.communityButtonText}>Suggest opening hours</Text>
+        </Pressable>
+      )}
+    </View>
+  )
+}
+
 export function DetailSheet({
   selected,
   onClose,
@@ -286,8 +435,28 @@ export function DetailSheet({
         </Text>
       ))}
       {selected.hygieneLookup && <HygieneRow lookup={selected.hygieneLookup} />}
+      {selected.mooringKey && <MooringCommunityBlock mooring={selected.mooringKey} />}
+      {selected.placeEdit && <SuggestHoursBlock place={selected.placeEdit} />}
       {selected.facilityId && (
         <CommunityStatus facilityId={selected.facilityId} coords={selected.coords} />
+      )}
+      {selected.actions && (
+        <View style={styles.actionsRow}>
+          {selected.actions.map((action) => (
+            <Pressable key={action.label} style={styles.communityButton} onPress={action.onPress}>
+              <Feather
+                name={action.destructive ? 'trash-2' : 'refresh-cw'}
+                size={14}
+                color={action.destructive ? day.shieldRed : day.greenDark}
+              />
+              <Text
+                style={[styles.communityButtonText, action.destructive && { color: day.shieldRed }]}
+              >
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       )}
       <View style={styles.buttons}>
         {selected.link ? (
@@ -320,6 +489,19 @@ export function DetailSheet({
 }
 
 const styles = StyleSheet.create({
+  actionsRow: { flexDirection: 'row', gap: 8 },
+  communityPhoto: { width: '100%', height: 120, borderRadius: 12 },
+  hoursEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  hoursInput: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: day.surfaceMuted,
+    paddingHorizontal: 10,
+    fontFamily: font.regular,
+    fontSize: 13,
+    color: day.ink,
+  },
   hygieneRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hygieneText: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
   community: { gap: 6, marginTop: 2 },

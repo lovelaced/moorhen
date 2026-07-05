@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export interface CruiseSession {
   id: string
+  /** 'cruise' = a tracked cruise; 'mooring' = a logged mooring spot. */
+  kind?: 'cruise' | 'mooring'
   startedAtMs: number
   endedAtMs: number
   distanceM: number

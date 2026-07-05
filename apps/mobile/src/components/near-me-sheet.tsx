@@ -235,6 +235,9 @@ export function NearMeSheet({
           data={rows}
           keyExtractor={(row) => ('header' in row ? row.header : row.label)}
           style={styles.list}
+          showsVerticalScrollIndicator
+          persistentScrollbar
+          ListFooterComponent={<View style={styles.listFooter} />}
           renderItem={({ item }) =>
             'header' in item ? (
               <Text style={styles.groupHeader}>{item.header}</Text>
@@ -267,7 +270,7 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 12,
-    maxHeight: '60%',
+    maxHeight: '80%',
     backgroundColor: day.surface,
     borderRadius: radius.card,
     padding: 16,
@@ -278,7 +281,8 @@ const styles = StyleSheet.create({
   error: { fontFamily: font.medium, fontSize: 13, color: day.shieldRed },
   loading: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   loadingText: { fontFamily: font.regular, fontSize: 13, color: day.ink2 },
-  list: { marginTop: 2 },
+  list: { marginTop: 2, flexGrow: 0 },
+  listFooter: { height: 8 },
   groupHeader: {
     fontFamily: font.semibold,
     fontSize: 12,

@@ -82,6 +82,106 @@ export async function shareMooring(capture: MooringCapture): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** Upload a photo to the public bucket; returns its public URL. */
+async function uploadPhoto(localUri: string, prefix: string): Promise<string> {
+  const supabase = communityClient()
+  if (!supabase) throw new Error('community backend not configured')
+  await ensureSignedIn(supabase)
+  const response = await fetch(localUri)
+  const blob = await response.arrayBuffer()
+  const path = `${prefix}/${Date.now()}.jpg`
+  const { error } = await supabase.storage
+    .from('photos')
+    .upload(path, blob, { contentType: 'image/jpeg' })
+  if (error) throw new Error(error.message)
+  return supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+}
+
+/** Attach a photo (and optional stars) to an existing public mooring. */
+export async function addMooringPhoto(
+  mooringKey: string,
+  point: [number, number],
+  photoUri: string,
+  stars?: number,
+): Promise<void> {
+  const supabase = communityClient()
+  if (!supabase) throw new Error('community backend not configured')
+  const author = await ensureSignedIn(supabase)
+  const photoUrl = await uploadPhoto(
+    photoUri,
+    `moorings/${mooringKey.replace(/[^a-z0-9-]/gi, '_')}`,
+  )
+  const { error } = await supabase.from('mooring_reviews').insert({
+    mooring_key: mooringKey,
+    lon: point[0],
+    lat: point[1],
+    stars: stars ?? 5,
+    photo_url: photoUrl,
+    author,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export interface MooringCommunity {
+  photoUrls: string[]
+  avgStars: number | null
+  reviewCount: number
+}
+
+/** Published community photos + average stars for one mooring. */
+export async function fetchMooringCommunity(mooringKey: string): Promise<MooringCommunity | null> {
+  const supabase = communityClient()
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('mooring_reviews')
+    .select('photo_url, stars')
+    .eq('mooring_key', mooringKey)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error || !data || data.length === 0) return null
+  const stars = data.map((r) => r.stars).filter((v): v is number => typeof v === 'number')
+  return {
+    photoUrls: data.map((r) => r.photo_url).filter((u): u is string => !!u),
+    avgStars: stars.length > 0 ? stars.reduce((a, b) => a + b, 0) / stars.length : null,
+    reviewCount: data.length,
+  }
+}
+
+/** Suggest opening hours for a place (pending until autoconfirmed). */
+export async function submitHours(
+  placeId: string,
+  point: [number, number],
+  value: string,
+): Promise<void> {
+  const supabase = communityClient()
+  if (!supabase) throw new Error('community backend not configured')
+  const author = await ensureSignedIn(supabase)
+  const { error } = await supabase.from('place_edits').insert({
+    place_id: placeId,
+    field: 'opening_hours',
+    value,
+    lon: point[0],
+    lat: point[1],
+    author,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Latest visible contributed hours for a place, if any. */
+export async function fetchContributedHours(placeId: string): Promise<string | null> {
+  const supabase = communityClient()
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('place_edits')
+    .select('value')
+    .eq('place_id', placeId)
+    .eq('field', 'opening_hours')
+    .order('created_at', { ascending: false })
+    .limit(1)
+  if (error || !data || data.length === 0) return null
+  return data[0]!.value
+}
+
 export interface CommunityReport {
   status: FacilityStatus
   note: string | null
