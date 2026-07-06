@@ -102,6 +102,16 @@ export function pubMooringNote(props: Record<string, unknown>): string | null {
   return 'No mooring recorded nearby'
 }
 
+/** These live ON the water — "walk from the cut" would be noise. */
+const ON_WATER_CATEGORIES = new Set([
+  'water-point',
+  'elsan',
+  'winding-hole',
+  'lock-gate',
+  'junction',
+  'drinking-water',
+])
+
 export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const rawCategory = String(props['category'])
@@ -109,7 +119,8 @@ export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const rawHours = typeof props['hours'] === 'string' ? props['hours'] : null
   const hours = rawHours ? formatOpeningHours(rawHours).join('\n') : null
   const open = rawHours ? isOpenNow(rawHours) : null
-  const details = [walkNote(props), pubMooringNote(props), hours].filter(
+  const walk = ON_WATER_CATEGORIES.has(rawCategory) ? null : walkNote(props)
+  const details = [walk, pubMooringNote(props), hours].filter(
     (line): line is string => line !== null,
   )
   const coords = pointOf(feature)

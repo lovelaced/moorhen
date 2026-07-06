@@ -11,9 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "app.moorhen",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "location"
-        ]
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {

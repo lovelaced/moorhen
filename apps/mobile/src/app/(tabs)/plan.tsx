@@ -12,7 +12,12 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SearchModal } from '../../components/search-modal'
-import { alertsAvailable, subscribeWaterways } from '../../lib/alerts'
+import {
+  alertsAvailable,
+  subscribeWaterways,
+  unsubscribeWaterway,
+  useAlertSubscriptions,
+} from '../../lib/alerts'
 import { boatWarnings, useBoat } from '../../lib/boat-store'
 import {
   bestFrontierName,
@@ -21,6 +26,7 @@ import {
   type PlaceEntry,
 } from '../../lib/places-index'
 import { plannerStore, usePlanner } from '../../lib/planner-store'
+import type { RouteNotice } from '../../lib/route-notices'
 import { loadGraph } from '../../lib/route-graph'
 import { day as dayTheme, font, radius, shadow } from '../../theme'
 
@@ -32,7 +38,12 @@ import { day as dayTheme, font, radius, shadow } from '../../theme'
 export default function PlanScreen() {
   const { from, to, route, planning, stops, routeNotices, hoursPerDay } = usePlanner()
   const boat = useBoat()
-  const [alerted, setAlerted] = useState(false)
+  const [expandedNotice, setExpandedNotice] = useState<string | null>(null)
+  const subscriptions = useAlertSubscriptions()
+  const routeAlerted =
+    route !== null &&
+    route.waterways.length > 0 &&
+    route.waterways.every((name) => subscriptions.includes(name))
   const warnings = route ? boatWarnings(boat, route.narrowLocks, route.broadLocks) : []
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
@@ -227,16 +238,23 @@ export default function PlanScreen() {
               {alertsAvailable() && route.waterways.length > 0 && (
                 <Pressable
                   style={styles.alertButton}
-                  onPress={async () => {
-                    const ok = await subscribeWaterways(route.waterways)
-                    setAlerted(ok)
+                  onPress={() => {
+                    if (routeAlerted) {
+                      for (const name of route.waterways) void unsubscribeWaterway(name)
+                    } else {
+                      void subscribeWaterways(route.waterways)
+                    }
                   }}
                 >
-                  <Feather name="bell" size={14} color={dayTheme.greenDark} />
-                  <Text style={styles.alertButtonText}>
-                    {alerted
-                      ? 'Alerts on for this route'
-                      : `Alert me about stoppages (${route.waterways.join(', ')})`}
+                  <Feather
+                    name={routeAlerted ? 'bell-off' : 'bell'}
+                    size={15}
+                    color={dayTheme.greenDark}
+                  />
+                  <Text style={styles.alertButtonText} numberOfLines={2}>
+                    {routeAlerted
+                      ? 'Alerts on — tap to turn off'
+                      : `Alert me about stoppages on ${route.waterways.join(' & ')}`}
                   </Text>
                 </Pressable>
               )}
@@ -259,23 +277,19 @@ export default function PlanScreen() {
               <View style={styles.warnCard}>
                 <Feather name="alert-triangle" size={18} color="#B98A16" />
                 <View style={styles.warnCol}>
-                  {routeNotices.slice(0, 3).map((notice) => (
-                    <Pressable
-                      key={notice.id}
-                      onPress={() => notice.url && Linking.openURL(notice.url)}
-                    >
-                      <Text style={styles.warnTitle}>
-                        Stoppage at mile {(notice.chainageM / 1609.344).toFixed(1)}
-                      </Text>
-                      <Text style={styles.warnBody}>
-                        {notice.title}
-                        {notice.start || notice.end
-                          ? ` · ${fmtDate(notice.start)}–${fmtDate(notice.end)}`
-                          : ''}
-                      </Text>
-                    </Pressable>
-                  ))}
-                  {routeNotices.length > 3 && (
+                  {routeNotices
+                    .slice(0, expandedNotice === null ? 3 : routeNotices.length)
+                    .map((notice) => (
+                      <NoticeRow
+                        key={notice.id}
+                        notice={notice}
+                        expanded={expandedNotice === notice.id}
+                        onToggle={() =>
+                          setExpandedNotice(expandedNotice === notice.id ? null : notice.id)
+                        }
+                      />
+                    ))}
+                  {expandedNotice === null && routeNotices.length > 3 && (
                     <Text style={styles.warnBody}>
                       +{routeNotices.length - 3} more on this route
                     </Text>
@@ -378,6 +392,45 @@ function dedupeReach(
     .map(([name, v]) => ({ name, ...v }))
     .sort((a, b) => b.distanceM - a.distanceM)
     .slice(0, 8)
+}
+
+function NoticeRow({
+  notice,
+  expanded,
+  onToggle,
+}: {
+  notice: RouteNotice
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const kind = /restriction/i.test(notice.title) ? 'Restriction' : 'Stoppage'
+  return (
+    <Pressable onPress={onToggle}>
+      <View style={styles.noticeHead}>
+        <Text style={styles.warnTitle}>
+          {kind} at mile {(notice.chainageM / 1609.344).toFixed(1)}
+        </Text>
+        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={dayTheme.ink3} />
+      </View>
+      <Text style={styles.warnBody} numberOfLines={expanded ? undefined : 1}>
+        {notice.title}
+      </Text>
+      {expanded && (
+        <>
+          {(notice.start || notice.end) && (
+            <Text style={styles.warnBody}>
+              {fmtDate(notice.start)} – {notice.end ? fmtDate(notice.end) : 'until further notice'}
+            </Text>
+          )}
+          {notice.url && (
+            <Pressable hitSlop={6} onPress={() => Linking.openURL(notice.url!)}>
+              <Text style={styles.warnLink}>View CRT notice</Text>
+            </Pressable>
+          )}
+        </>
+      )}
+    </Pressable>
+  )
 }
 
 const fmtDate = (iso: string | null) =>
@@ -503,9 +556,10 @@ const styles = StyleSheet.create({
   alertButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 40,
+    gap: 12,
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: radius.control,
     backgroundColor: dayTheme.greenSoft,
   },
@@ -513,7 +567,8 @@ const styles = StyleSheet.create({
     fontFamily: font.semibold,
     fontSize: 12,
     color: dayTheme.greenDark,
-    flexShrink: 1,
+    flex: 1,
+    lineHeight: 17,
   },
   sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink, marginTop: 4 },
   warnCard: {
@@ -527,6 +582,8 @@ const styles = StyleSheet.create({
   },
   warnCol: { flex: 1, gap: 6 },
   warnTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
+  noticeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.green, marginTop: 2 },
   warnBody: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2, lineHeight: 17 },
   dayRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dayDot: {

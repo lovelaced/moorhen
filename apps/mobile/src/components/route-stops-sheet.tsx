@@ -125,8 +125,10 @@ export function RouteStopsSheet({
                   {item.name}
                 </Text>
                 <Text style={styles.rowMeta}>
-                  {item.category} · mile {(item.chainageM / 1609.344).toFixed(1)} ·{' '}
-                  {Math.max(1, Math.round(item.offsetM / 80))} min walk
+                  {item.category} · mile {(item.chainageM / 1609.344).toFixed(1)}
+                  {groupOf(item.icon) === 'Places'
+                    ? ` · ${Math.max(1, Math.round(item.offsetM / 80))} min walk`
+                    : ''}
                 </Text>
               </View>
             </Pressable>

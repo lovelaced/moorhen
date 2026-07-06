@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMoorings } from '../../lib/artifacts'
 import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
 import { NearMeSheet, type Nearest } from '../../components/near-me-sheet'
+import { PhotoPin } from '../../components/photo-pin'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
 import { communityConfigured, fetchSharedMoorings, shareMooring } from '../../lib/community'
 import {
@@ -78,7 +79,6 @@ const MARKER_IMAGES = {
   pumpout: require('../../assets/markers/pumpout.png'),
   shower: require('../../assets/markers/shower.png'),
   reach: require('../../assets/markers/reach.png'),
-  'photo-pin': require('../../assets/markers/photo-pin.png'),
   community: require('../../assets/markers/community.png'),
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -273,13 +273,6 @@ export default function MapScreen() {
       })
       .catch(() => {})
   }, [])
-  const mooringPhotos = useMemo(() => {
-    const images: Record<string, string> = {}
-    for (const mooring of myMoorings) {
-      if (mooring.photoUri) images[`photo-${mooring.id}`] = mooring.photoUri
-    }
-    return images
-  }, [myMoorings])
 
   const toggleChip = useCallback((key: ChipKey) => {
     setActive((current) => {
@@ -391,8 +384,19 @@ export default function MapScreen() {
   const onStopSelect = useCallback((stop: RouteStop) => {
     setStopsOpen(false)
     cameraRef.current?.easeTo({ center: stop.point, zoom: 14.5, duration: 700 })
+    const onWater = [
+      'Water point',
+      'Elsan',
+      'Pump-out',
+      'Rubbish disposal',
+      'Showers',
+      'CRT facility',
+      'Mooring',
+    ].includes(stop.category)
     const details = [
-      `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route · ${Math.max(1, Math.round(stop.offsetM / 80))} min walk from the water`,
+      onWater
+        ? `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route`
+        : `Mile ${(stop.chainageM / 1609.344).toFixed(1)} of your route · ${Math.max(1, Math.round(stop.offsetM / 80))} min walk from the water`,
     ]
     const mooringNote = stop.pubProps ? pubMooringNote(stop.pubProps) : null
     if (mooringNote) details.push(mooringNote)
@@ -504,7 +508,6 @@ export default function MapScreen() {
           />
           <MapLibre.UserLocation />
           <MapLibre.Images images={MARKER_IMAGES} />
-          {Object.keys(mooringPhotos).length > 0 && <MapLibre.Images images={mooringPhotos} />}
 
           <MapLibre.GeoJSONSource
             id="waterways"
@@ -811,30 +814,6 @@ export default function MapScreen() {
                 })
               }}
             >
-              {/* photo pins: white teardrop with the photo in the head, tip on the spot */}
-              <MapLibre.Layer
-                type="symbol"
-                id="my-mooring-pin-bg"
-                filter={['==', ['get', 'hasPhoto'], true]}
-                layout={{
-                  'icon-image': 'photo-pin',
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.16, 16, 0.42],
-                  'icon-anchor': 'bottom',
-                  'icon-allow-overlap': true,
-                }}
-              />
-              <MapLibre.Layer
-                type="symbol"
-                id="my-mooring-photo"
-                filter={['==', ['get', 'hasPhoto'], true]}
-                layout={{
-                  'icon-image': ['concat', 'photo-', ['get', 'id']],
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.147, 16, 0.386],
-                  'icon-anchor': 'bottom',
-                  'icon-offset': [0, -61],
-                  'icon-allow-overlap': true,
-                }}
-              />
               <MapLibre.Layer
                 type="symbol"
                 id="my-mooring-icon"
@@ -905,6 +884,43 @@ export default function MapScreen() {
               />
             </MapLibre.GeoJSONSource>
           )}
+
+          {myMoorings
+            .filter((mooring) => mooring.photoUri)
+            .map((mooring) => (
+              <MapLibre.Marker
+                key={mooring.id}
+                id={`photo-pin-${mooring.id}`}
+                lngLat={mooring.point}
+                anchor="bottom"
+              >
+                <PhotoPin
+                  uri={mooring.photoUri!}
+                  onPress={() => {
+                    const details: string[] = ['Your private mooring']
+                    if (mooring.edgeType) details.push(`Edge: ${mooring.edgeType}`)
+                    if (mooring.speed)
+                      details.push(`Signal: ${mooring.speed.downMbps.toFixed(1)} Mbps`)
+                    setSelected({
+                      title: 'Saved mooring',
+                      subtitle: 'Only visible to you',
+                      details,
+                      coords: mooring.point,
+                      actions: [
+                        {
+                          label: 'Delete',
+                          destructive: true,
+                          onPress: () => {
+                            void deleteMooring(mooring.id)
+                            setSelected(null)
+                          },
+                        },
+                      ],
+                    })
+                  }}
+                />
+              </MapLibre.Marker>
+            ))}
 
           {routeShape && (
             <MapLibre.GeoJSONSource id="route" data={routeShape}>
