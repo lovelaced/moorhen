@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SearchModal } from '../../components/search-modal'
+import { boatWarnings, useBoat } from '../../lib/boat-store'
 import {
   bestFrontierName,
   loadPlacesIndex,
@@ -29,6 +30,8 @@ import { day as dayTheme, font, radius, shadow } from '../../theme'
  */
 export default function PlanScreen() {
   const { from, to, route, planning, stops, routeNotices, hoursPerDay } = usePlanner()
+  const boat = useBoat()
+  const warnings = route ? boatWarnings(boat, route.narrowLocks, route.broadLocks) : []
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
   const [mode, setMode] = useState<'route' | 'reach'>('route')
@@ -220,6 +223,19 @@ export default function PlanScreen() {
                 <Text style={styles.mapButtonText}>View on map</Text>
               </Pressable>
             </View>
+
+            {warnings.length > 0 && (
+              <View style={styles.warnCard}>
+                <Feather name="alert-octagon" size={18} color="#9C4A32" />
+                <View style={styles.warnCol}>
+                  {warnings.map((warning) => (
+                    <Text key={warning} style={styles.warnBody}>
+                      {warning}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {routeNotices && routeNotices.length > 0 && (
               <View style={styles.warnCard}>

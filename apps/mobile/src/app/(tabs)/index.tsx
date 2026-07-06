@@ -22,6 +22,7 @@ import {
   type SavedMooring,
 } from '../../lib/moorings-store'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
+import { boatWarnings, useBoat } from '../../lib/boat-store'
 import { plannerStore, usePlanner } from '../../lib/planner-store'
 import type { RouteStop } from '../../lib/route-stops'
 import {
@@ -336,6 +337,11 @@ export default function MapScreen() {
     },
     [searchTarget],
   )
+
+  const boat = useBoat()
+  const boatWarningLine = route
+    ? (boatWarnings(boat, route.narrowLocks, route.broadLocks)[0] ?? null)
+    : null
 
   const reachShape = useMemo<GeoJSON.FeatureCollection>(
     () => ({
@@ -1095,6 +1101,7 @@ export default function MapScreen() {
                   : ''}
                 {route.cruisingDays > 1 ? ` · ~${Math.ceil(route.cruisingDays)} cruising days` : ''}
               </Text>
+              {boatWarningLine && <Text style={styles.routeBoatWarn}>⚠ {boatWarningLine}</Text>}
               {routeNotices && routeNotices.length > 0 && (
                 <Text style={styles.routeWarn}>
                   ⚠ {routeNotices.length} stoppage{routeNotices.length === 1 ? '' : 's'} on this
@@ -1305,6 +1312,7 @@ const styles = StyleSheet.create({
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.green, marginTop: 2 },
   routeWarn: { fontFamily: font.semibold, fontSize: 12, color: '#B98A16', marginTop: 2 },
+  routeBoatWarn: { fontFamily: font.semibold, fontSize: 12, color: '#9C4A32', marginTop: 2 },
   paceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   paceLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2, flex: 1 },
   paceButton: {
