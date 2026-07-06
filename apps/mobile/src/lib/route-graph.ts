@@ -8,6 +8,7 @@ import {
   type WaterwayGraph,
 } from '@moorhen/graph'
 import { urls } from '../data'
+import { offlineDataFile } from './offline'
 
 /**
  * On-device routing over the published waterway graph. The graph is fetched
@@ -23,16 +24,28 @@ interface GraphFile {
 
 let graphPromise: Promise<WaterwayGraph> | null = null
 
+async function fetchGraphFile(): Promise<GraphFile> {
+  try {
+    const response = await fetch(urls.graph)
+    if (!response.ok) throw new Error(`graph fetch failed: HTTP ${response.status}`)
+    return (await response.json()) as GraphFile
+  } catch (error) {
+    const local = offlineDataFile('graph.json')
+    if (local) return (await local.json()) as GraphFile
+    throw error
+  }
+}
+
 export function loadGraph(): Promise<WaterwayGraph> {
-  graphPromise ??= fetch(urls.graph)
-    .then((response) => {
-      if (!response.ok) throw new Error(`graph fetch failed: HTTP ${response.status}`)
-      return response.json() as Promise<GraphFile>
-    })
-    .then((file) => ({
+  if (!graphPromise) {
+    graphPromise = fetchGraphFile().then((file) => ({
       vertices: new Map(file.vertices.map((v) => [v.id, v])),
       edges: file.edges,
     }))
+    graphPromise.catch(() => {
+      graphPromise = null
+    })
+  }
   return graphPromise
 }
 

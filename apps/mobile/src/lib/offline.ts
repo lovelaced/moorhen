@@ -27,12 +27,25 @@ export interface RegionStatus {
   bytes: number
 }
 
-const DATA_FILES = ['waterways.geojson', 'osm-pois.geojson', 'locks.geojson', 'moorings.geojson']
+const DATA_FILES = [
+  'waterways.geojson',
+  'osm-pois.geojson',
+  'locks.geojson',
+  'moorings.geojson',
+  'graph.json',
+  'crt-facilities.geojson',
+]
 
 const offlineDir = new Directory(Paths.document, 'moorhen-offline')
 
 function ensureDir(): void {
   if (!offlineDir.exists) offlineDir.create({ intermediates: true })
+}
+
+/** A downloaded copy of a data artifact, or null when not present. */
+export function offlineDataFile(name: string): File | null {
+  const file = new File(offlineDir, name)
+  return file.exists ? file : null
 }
 
 export function basemapFile(regionId: string): File {

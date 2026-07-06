@@ -1,4 +1,5 @@
 import { urls } from '../data'
+import { offlineDataFile } from './offline'
 
 /**
  * Session-cached fetchers for the published artifacts — search, route stops
@@ -7,13 +8,26 @@ import { urls } from '../data'
 
 const cache = new Map<string, Promise<GeoJSON.FeatureCollection>>()
 
+/** Network first; the downloaded offline pack when there's no signal. */
+async function loadWithOfflineFallback<T>(url: string): Promise<T> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`fetch ${url}: HTTP ${response.status}`)
+    return (await response.json()) as T
+  } catch (error) {
+    const name = url.split('/').pop()!
+    const local = offlineDataFile(name)
+    if (local) return (await local.json()) as T
+    throw error
+  }
+}
+
 function fetchCollection(url: string): Promise<GeoJSON.FeatureCollection> {
   let existing = cache.get(url)
   if (!existing) {
-    existing = fetch(url).then((response) => {
-      if (!response.ok) throw new Error(`fetch ${url}: HTTP ${response.status}`)
-      return response.json() as Promise<GeoJSON.FeatureCollection>
-    })
+    existing = loadWithOfflineFallback<GeoJSON.FeatureCollection>(url)
+    // a rejected promise must not poison the cache — allow retries
+    existing.catch(() => cache.delete(url))
     cache.set(url, existing)
   }
   return existing
@@ -40,11 +54,13 @@ export interface NoticeRecord {
 let noticesPromise: Promise<NoticeRecord[]> | null = null
 
 export function getNotices(): Promise<NoticeRecord[]> {
-  noticesPromise ??= fetch(urls.notices)
-    .then((response) => {
-      if (!response.ok) throw new Error(`notices fetch: HTTP ${response.status}`)
-      return response.json() as Promise<{ notices: NoticeRecord[] }>
+  if (!noticesPromise) {
+    noticesPromise = loadWithOfflineFallback<{ notices: NoticeRecord[] }>(urls.notices).then(
+      (file) => file.notices,
+    )
+    noticesPromise.catch(() => {
+      noticesPromise = null
     })
-    .then((file) => file.notices)
+  }
   return noticesPromise
 }

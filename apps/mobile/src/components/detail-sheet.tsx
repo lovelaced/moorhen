@@ -10,7 +10,7 @@ import {
   type FacilityStatus,
 } from '../lib/community'
 import { fetchContributedHours, submitHours } from '../lib/community'
-import { formatOpeningHours } from '../lib/format-hours'
+import { formatOpeningHours, isOpenNow } from '../lib/format-hours'
 import { fetchHygieneRating, type HygieneRating } from '../lib/hygiene'
 import { day, font, radius, shadow } from '../theme'
 
@@ -31,6 +31,8 @@ export interface SelectedFeature {
   facilityId?: string
   /** Set for pubs/shops: look up the FSA food-hygiene rating live. */
   hygieneLookup?: { name: string; point: [number, number] }
+  /** Computed from opening hours when the grammar is evaluable. */
+  openNow?: boolean
   /** Extra buttons (delete a private mooring, retest signal…). */
   actions?: Array<{ label: string; destructive?: boolean; onPress: () => void }>
   /** Place id + point — enables "suggest opening hours". */
@@ -101,8 +103,9 @@ export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const rawCategory = String(props['category'])
   const category = CATEGORY_LABELS[rawCategory] ?? 'Place'
-  const hours =
-    typeof props['hours'] === 'string' ? formatOpeningHours(props['hours']).join('\n') : null
+  const rawHours = typeof props['hours'] === 'string' ? props['hours'] : null
+  const hours = rawHours ? formatOpeningHours(rawHours).join('\n') : null
+  const open = rawHours ? isOpenNow(rawHours) : null
   const details = [walkNote(props), pubMooringNote(props), hours].filter(
     (line): line is string => line !== null,
   )
@@ -115,6 +118,7 @@ export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
     subtitle: `${category} · OpenStreetMap`,
     details,
     coords,
+    ...(open !== null ? { openNow: open } : {}),
     ...(wantsHygiene ? { hygieneLookup: { name, point: coords } } : {}),
     ...(editable && feature.id !== undefined
       ? { placeEdit: { placeId: `osm:${feature.id}`, point: coords, name } }
@@ -353,7 +357,16 @@ export function DetailSheet({
     <Animated.View style={[styles.sheet, shadow.card, { transform: [{ translateY: rise }] }]}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={styles.title}>{selected.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{selected.title}</Text>
+            {selected.openNow !== undefined && (
+              <View style={[styles.openTag, !selected.openNow && styles.closedTag]}>
+                <Text style={[styles.openTagText, !selected.openNow && styles.closedTagText]}>
+                  {selected.openNow ? 'Open now' : 'Closed now'}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.subtitle}>{selected.subtitle}</Text>
         </View>
         <Pressable onPress={onClose} hitSlop={12}>
@@ -388,6 +401,26 @@ export function DetailSheet({
           ))}
         </View>
       )}
+      <View style={styles.linksRow}>
+        <Pressable
+          hitSlop={6}
+          onPress={() =>
+            Linking.openURL(
+              `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=walking`,
+            )
+          }
+        >
+          <Text style={styles.linkText}>Walking directions</Text>
+        </Pressable>
+        <Pressable
+          hitSlop={6}
+          onPress={() =>
+            Linking.openURL(`https://www.mapillary.com/app/?lat=${lat}&lng=${lon}&z=17`)
+          }
+        >
+          <Text style={styles.linkText}>Towpath imagery</Text>
+        </Pressable>
+      </View>
       <View style={styles.buttons}>
         {selected.link ? (
           <Pressable
@@ -419,6 +452,19 @@ export function DetailSheet({
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  openTag: {
+    backgroundColor: day.greenSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    height: 20,
+    justifyContent: 'center',
+  },
+  openTagText: { fontFamily: font.semibold, fontSize: 11, color: day.greenDark },
+  closedTag: { backgroundColor: '#F3DCD3' },
+  closedTagText: { color: '#9C4A32' },
+  linksRow: { flexDirection: 'row', gap: 16 },
+  linkText: { fontFamily: font.semibold, fontSize: 12, color: day.green },
   actionsRow: { flexDirection: 'row', gap: 8 },
   hoursEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   hoursInput: {

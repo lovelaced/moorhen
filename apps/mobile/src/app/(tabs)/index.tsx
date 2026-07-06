@@ -1169,7 +1169,11 @@ export default function MapScreen() {
         style={[styles.routeButton, shadow.pill, plannerOpen && styles.routeButtonActive]}
         onPress={() => (plannerOpen ? clearPlanner() : setPlannerOpen(true))}
       >
-        <Feather name="corner-up-right" size={20} color={plannerOpen ? day.surface : day.ink} />
+        <Feather
+          name={plannerOpen ? 'x' : 'corner-up-right'}
+          size={20}
+          color={plannerOpen ? day.surface : day.ink}
+        />
       </Pressable>
       <Pressable style={[styles.locateButton, shadow.pill]} onPress={locateMe}>
         <Feather name="crosshair" size={20} color={day.ink} />
