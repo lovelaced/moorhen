@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useEffect, useRef, useState } from 'react'
 import * as Linking from 'expo-linking'
-import { Animated, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import {
   communityConfigured,
   fetchFacilityReports,
@@ -9,13 +9,7 @@ import {
   type CommunityReport,
   type FacilityStatus,
 } from '../lib/community'
-import {
-  addMooringPhoto,
-  fetchContributedHours,
-  fetchMooringCommunity,
-  submitHours,
-  type MooringCommunity,
-} from '../lib/community'
+import { fetchContributedHours, submitHours } from '../lib/community'
 import { formatOpeningHours } from '../lib/format-hours'
 import { fetchHygieneRating, type HygieneRating } from '../lib/hygiene'
 import { day, font, radius, shadow } from '../theme'
@@ -39,8 +33,6 @@ export interface SelectedFeature {
   hygieneLookup?: { name: string; point: [number, number] }
   /** Extra buttons (delete a private mooring, retest signal…). */
   actions?: Array<{ label: string; destructive?: boolean; onPress: () => void }>
-  /** Public mooring key — enables community photos/stars. */
-  mooringKey?: { key: string; point: [number, number] }
   /** Place id + point — enables "suggest opening hours". */
   placeEdit?: { placeId: string; point: [number, number]; name: string }
 }
@@ -171,9 +163,6 @@ export function selectMooring(feature: GeoJSON.Feature): SelectedFeature {
     subtitle: access === 'public' ? 'Visitor mooring · OpenStreetMap' : `Mooring (${access})`,
     details,
     coords,
-    ...(access === 'public' && feature.id !== undefined
-      ? { mooringKey: { key: `osm:${feature.id}`, point: coords } }
-      : {}),
   }
 }
 
@@ -278,64 +267,6 @@ function HygieneRow({ lookup }: { lookup: { name: string; point: [number, number
   )
 }
 
-function MooringCommunityBlock({ mooring }: { mooring: { key: string; point: [number, number] } }) {
-  const [info, setInfo] = useState<MooringCommunity | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [thanks, setThanks] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    fetchMooringCommunity(mooring.key).then((found) => {
-      if (!cancelled) setInfo(found)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [mooring.key])
-
-  if (!communityConfigured()) return null
-
-  const addPhoto = async () => {
-    const ImagePicker = await import('expo-image-picker')
-    const permission = await ImagePicker.requestCameraPermissionsAsync()
-    if (!permission.granted) return
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.6, exif: false })
-    if (result.canceled || !result.assets[0]) return
-    setBusy(true)
-    try {
-      await addMooringPhoto(mooring.key, mooring.point, result.assets[0].uri)
-      setThanks(true)
-      setInfo(await fetchMooringCommunity(mooring.key))
-    } catch {
-      // best-effort
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <View style={styles.community}>
-      {info?.avgStars != null && (
-        <Text style={styles.communityLatest}>
-          {'★'.repeat(Math.round(info.avgStars))} {info.avgStars.toFixed(1)} · {info.reviewCount}{' '}
-          boater{info.reviewCount === 1 ? '' : 's'}
-        </Text>
-      )}
-      {info && info.photoUrls.length > 0 && (
-        <Image source={{ uri: info.photoUrls[0] }} style={styles.communityPhoto} />
-      )}
-      {thanks ? (
-        <Text style={styles.communityThanks}>Photo shared — thanks!</Text>
-      ) : (
-        <Pressable style={styles.communityButton} onPress={addPhoto} disabled={busy}>
-          <Feather name="camera" size={14} color={day.greenDark} />
-          <Text style={styles.communityButtonText}>{busy ? 'Uploading…' : 'Add a photo'}</Text>
-        </Pressable>
-      )}
-    </View>
-  )
-}
-
 function SuggestHoursBlock({
   place,
 }: {
@@ -435,7 +366,6 @@ export function DetailSheet({
         </Text>
       ))}
       {selected.hygieneLookup && <HygieneRow lookup={selected.hygieneLookup} />}
-      {selected.mooringKey && <MooringCommunityBlock mooring={selected.mooringKey} />}
       {selected.placeEdit && <SuggestHoursBlock place={selected.placeEdit} />}
       {selected.facilityId && (
         <CommunityStatus facilityId={selected.facilityId} coords={selected.coords} />
@@ -490,7 +420,6 @@ export function DetailSheet({
 
 const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', gap: 8 },
-  communityPhoto: { width: '100%', height: 120, borderRadius: 12 },
   hoursEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   hoursInput: {
     flex: 1,

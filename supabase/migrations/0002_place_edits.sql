@@ -1,31 +1,8 @@
--- Community photos on public moorings + contributed opening hours.
---
--- Photos attach to EXISTING public moorings (mooring_reviews.photo_url with a
--- mooring_key) rather than each boater dropping a new pin — that's what keeps
--- the map uncluttered. The image bytes live in a public-read storage bucket;
--- uploads go through the authenticated role.
+-- Community-contributed facts about places — opening hours first.
+-- (Public photo uploads were considered and deliberately not shipped:
+-- image moderation burden isn't worth it yet. Private capture photos
+-- never leave the device.)
 
--- ---------------------------------------------------------------------------
--- storage: public-read photos bucket, authenticated uploads
--- ---------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('photos', 'photos', true)
-on conflict (id) do nothing;
-
-create policy photos_public_read on storage.objects
-  for select using (bucket_id = 'photos');
-
-create policy photos_authenticated_upload on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'photos' and owner = auth.uid());
-
-create policy photos_owner_delete on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'photos' and owner = auth.uid());
-
--- ---------------------------------------------------------------------------
--- place_edits: community-contributed facts about places (opening hours first)
--- ---------------------------------------------------------------------------
 create table public.place_edits (
   id uuid primary key default gen_random_uuid(),
   /** Stable place id — the osm feature id from the pois artifact. */
