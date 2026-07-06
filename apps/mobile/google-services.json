@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1061197198961",
+    "project_id": "moorhen-ca913",
+    "storage_bucket": "moorhen-ca913.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061197198961:android:1eb545899213f18a60cdd0",
+        "android_client_info": {
+          "package_name": "app.moorhen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtssnKa2YM3t9_500BLAKNo1LDMGxdD10"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

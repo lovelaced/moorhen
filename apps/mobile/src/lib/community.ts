@@ -82,6 +82,30 @@ export async function shareMooring(capture: MooringCapture): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** Published boater-shared moorings, as GeoJSON for the map layer. */
+export async function fetchSharedMoorings(): Promise<GeoJSON.FeatureCollection | null> {
+  const supabase = communityClient()
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('shared_moorings')
+    .select('id, lon, lat, edge_type, down_mbps, created_at')
+    .limit(2000)
+  if (error || !data) return null
+  return {
+    type: 'FeatureCollection',
+    features: data.map((row) => ({
+      type: 'Feature' as const,
+      id: row.id as string,
+      geometry: { type: 'Point' as const, coordinates: [row.lon as number, row.lat as number] },
+      properties: {
+        edgeType: row.edge_type,
+        downMbps: row.down_mbps,
+        sharedAt: row.created_at,
+      },
+    })),
+  }
+}
+
 /** Suggest opening hours for a place (pending until autoconfirmed). */
 export async function submitHours(
   placeId: string,

@@ -162,13 +162,13 @@ export function MooringCaptureSheet({
       </View>
 
       {communityConfigured() && (
-        <View style={styles.shareRow}>
+        <Pressable style={styles.shareRow} onPress={() => setShare((current) => !current)}>
           <View style={styles.shareText}>
             <Text style={styles.shareTitle}>Share with other boaters</Text>
             <Text style={styles.shareMeta}>Spot, edge type and signal — never your identity</Text>
           </View>
           <Switch value={share} onValueChange={setShare} trackColor={{ true: '#2E6B45' }} />
-        </View>
+        </Pressable>
       )}
 
       <Pressable

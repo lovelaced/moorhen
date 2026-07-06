@@ -6,6 +6,7 @@ import {
   type JourneyDay,
   type ReachPoint,
 } from '@moorhen/graph'
+import * as Linking from 'expo-linking'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -27,7 +28,7 @@ import { day as dayTheme, font, radius, shadow } from '../../theme'
  * day-by-day breakdown ("day 2 ends near Norton Junction") and pace tuning.
  */
 export default function PlanScreen() {
-  const { from, to, route, planning, stops, hoursPerDay } = usePlanner()
+  const { from, to, route, planning, stops, routeNotices, hoursPerDay } = usePlanner()
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
   const [mode, setMode] = useState<'route' | 'reach'>('route')
@@ -220,6 +221,35 @@ export default function PlanScreen() {
               </Pressable>
             </View>
 
+            {routeNotices && routeNotices.length > 0 && (
+              <View style={styles.warnCard}>
+                <Feather name="alert-triangle" size={18} color="#B98A16" />
+                <View style={styles.warnCol}>
+                  {routeNotices.slice(0, 3).map((notice) => (
+                    <Pressable
+                      key={notice.id}
+                      onPress={() => notice.url && Linking.openURL(notice.url)}
+                    >
+                      <Text style={styles.warnTitle}>
+                        Stoppage at mile {(notice.chainageM / 1609.344).toFixed(1)}
+                      </Text>
+                      <Text style={styles.warnBody}>
+                        {notice.title}
+                        {notice.start || notice.end
+                          ? ` · ${fmtDate(notice.start)}–${fmtDate(notice.end)}`
+                          : ''}
+                      </Text>
+                    </Pressable>
+                  ))}
+                  {routeNotices.length > 3 && (
+                    <Text style={styles.warnBody}>
+                      +{routeNotices.length - 3} more on this route
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
             {route.days.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Day by day</Text>
@@ -315,6 +345,9 @@ function dedupeReach(
     .sort((a, b) => b.distanceM - a.distanceM)
     .slice(0, 8)
 }
+
+const fmtDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '…'
 
 function DayRow({
   journeyDay,
@@ -434,6 +467,18 @@ const styles = StyleSheet.create({
   },
   mapButtonText: { fontFamily: font.semibold, fontSize: 14, color: '#FFFFFF' },
   sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink, marginTop: 4 },
+  warnCard: {
+    backgroundColor: dayTheme.amberSoft,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: '#E8B83066',
+    padding: 12,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  warnCol: { flex: 1, gap: 6 },
+  warnTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
+  warnBody: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2, lineHeight: 17 },
   dayRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dayDot: {
     width: 28,

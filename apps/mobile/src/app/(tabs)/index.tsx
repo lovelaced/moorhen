@@ -11,7 +11,7 @@ import { getMoorings } from '../../lib/artifacts'
 import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
 import { NearMeSheet, type Nearest } from '../../components/near-me-sheet'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
-import { shareMooring } from '../../lib/community'
+import { communityConfigured, fetchSharedMoorings, shareMooring } from '../../lib/community'
 import {
   deleteMooring,
   loadMoorings,
@@ -78,6 +78,7 @@ const MARKER_IMAGES = {
   shower: require('../../assets/markers/shower.png'),
   reach: require('../../assets/markers/reach.png'),
   'photo-pin': require('../../assets/markers/photo-pin.png'),
+  community: require('../../assets/markers/community.png'),
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -188,7 +189,16 @@ export default function MapScreen() {
   const [stopsOpen, setStopsOpen] = useState(false)
   const [nearMeOpen, setNearMeOpen] = useState(false)
   const [captureAt, setCaptureAt] = useState<[number, number] | null>(null)
-  const { from: fromEntry, to: toEntry, route, planning, stops, hoursPerDay, reach } = usePlanner()
+  const {
+    from: fromEntry,
+    to: toEntry,
+    route,
+    planning,
+    stops,
+    routeNotices,
+    hoursPerDay,
+    reach,
+  } = usePlanner()
   const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
 
@@ -226,6 +236,15 @@ export default function MapScreen() {
   }, [])
 
   const myMooringsShape = useMemo(() => mooringsToGeoJSON(myMoorings), [myMoorings])
+
+  // boater-shared moorings (community layer) — fetched once per session
+  const [communityMoorings, setCommunityMoorings] = useState<GeoJSON.FeatureCollection | null>(null)
+  useEffect(() => {
+    if (!communityConfigured()) return
+    fetchSharedMoorings()
+      .then(setCommunityMoorings)
+      .catch(() => {})
+  }, [])
 
   // public moorings render as anchor badges at their midpoint, not bank lines
   const [mooringPoints, setMooringPoints] = useState<GeoJSON.FeatureCollection>({
@@ -554,6 +573,50 @@ export default function MapScreen() {
               }}
             />
           </MapLibre.GeoJSONSource>
+
+          {communityMoorings && communityMoorings.features.length > 0 && (
+            <MapLibre.GeoJSONSource
+              id="community-moorings"
+              data={communityMoorings}
+              onPress={(event: FeaturePress) => {
+                const f = event.nativeEvent.features[0]
+                if (!f) return
+                event.stopPropagation()
+                const pt = (f.geometry as GeoJSON.Point).coordinates as [number, number]
+                const props = (f.properties ?? {}) as Record<string, unknown>
+                const details: string[] = []
+                if (props['edgeType']) details.push(`Edge: ${String(props['edgeType'])}`)
+                if (props['downMbps'])
+                  details.push(`Signal: ${Number(props['downMbps']).toFixed(1)} Mbps`)
+                if (props['sharedAt'])
+                  details.push(
+                    `Shared ${new Date(String(props['sharedAt'])).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                    })}`,
+                  )
+                setSelected({
+                  title: 'Boater-shared mooring',
+                  subtitle: 'Community · Moorhen boaters',
+                  details,
+                  coords: pt,
+                })
+              }}
+            >
+              <MapLibre.Layer
+                type="symbol"
+                id="community-mooring-badges"
+                minzoom={10}
+                layout={{
+                  visibility: active.has('moorings') ? 'visible' : 'none',
+                  'icon-image': 'community',
+                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.28, 14, 0.55],
+                  // community shares are sparse and load-bearing — always draw
+                  'icon-allow-overlap': true,
+                }}
+              />
+            </MapLibre.GeoJSONSource>
+          )}
 
           <MapLibre.GeoJSONSource
             id="facilities"
@@ -1032,6 +1095,12 @@ export default function MapScreen() {
                   : ''}
                 {route.cruisingDays > 1 ? ` · ~${Math.ceil(route.cruisingDays)} cruising days` : ''}
               </Text>
+              {routeNotices && routeNotices.length > 0 && (
+                <Text style={styles.routeWarn}>
+                  ⚠ {routeNotices.length} stoppage{routeNotices.length === 1 ? '' : 's'} on this
+                  route — see Plan tab
+                </Text>
+              )}
               {stops && stops.length > 0 && (
                 <Pressable onPress={() => setStopsOpen(true)}>
                   <Text style={styles.routeStopsLink}>
@@ -1153,7 +1222,11 @@ export default function MapScreen() {
           point={captureAt}
           onSave={(capture) => {
             void saveMooring(capture)
-            if (capture.share) shareMooring(capture).catch(() => {})
+            if (capture.share)
+              shareMooring(capture)
+                .then(() => fetchSharedMoorings())
+                .then((fc) => fc && setCommunityMoorings(fc))
+                .catch(() => {})
             setCaptureAt(null)
           }}
           onDismiss={() => setCaptureAt(null)}
@@ -1227,6 +1300,7 @@ const styles = StyleSheet.create({
   routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.green, marginTop: 2 },
+  routeWarn: { fontFamily: font.semibold, fontSize: 12, color: '#B98A16', marginTop: 2 },
   paceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   paceLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2, flex: 1 },
   paceButton: {

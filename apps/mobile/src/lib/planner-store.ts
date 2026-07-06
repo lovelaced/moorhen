@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { JourneyDay, ReachPoint } from '@moorhen/graph'
 import { useSyncExternalStore } from 'react'
 import type { SearchEntry } from '../components/search-modal'
+import { getNotices } from './artifacts'
+import { findRouteNotices, type RouteNotice } from './route-notices'
 import { loadGraph, planRoute, type PlannedRoute } from './route-graph'
 import { findRouteStops, type RouteStop } from './route-stops'
 
@@ -17,6 +19,8 @@ export interface PlannerState {
   planning: boolean
   route: (PlannedRoute & { days: JourneyDay[] }) | null
   stops: RouteStop[] | null
+  /** Navigation-blocking notices sitting on the planned route. */
+  routeNotices: RouteNotice[] | null
   hoursPerDay: number
   /** "How far can I get?" frontier — drawn on the map as flags. */
   reach: ReachPoint[] | null
@@ -33,6 +37,7 @@ class PlannerStore {
     planning: false,
     route: null,
     stops: null,
+    routeNotices: null,
     hoursPerDay: 7,
     reach: null,
   }
@@ -74,7 +79,15 @@ class PlannerStore {
 
   clear(): void {
     this.planGeneration++
-    this.patch({ from: null, to: null, route: null, stops: null, planning: false, reach: null })
+    this.patch({
+      from: null,
+      to: null,
+      route: null,
+      stops: null,
+      routeNotices: null,
+      planning: false,
+      reach: null,
+    })
   }
 
   setReach(reach: ReachPoint[] | null): void {
@@ -96,7 +109,7 @@ class PlannerStore {
       return
     }
     const generation = ++this.planGeneration
-    this.patch({ planning: true, route: null, stops: null })
+    this.patch({ planning: true, route: null, stops: null, routeNotices: null })
     try {
       const graph = await loadGraph()
       const route = planRoute(graph, from.point, to.point, hoursPerDay)
@@ -106,6 +119,9 @@ class PlannerStore {
         const stops = await findRouteStops(route.line)
         if (generation !== this.planGeneration) return
         this.patch({ stops })
+        const notices = await getNotices().catch(() => [])
+        if (generation !== this.planGeneration) return
+        this.patch({ routeNotices: findRouteNotices(route.line, notices) })
       }
     } catch {
       if (generation === this.planGeneration) this.patch({ planning: false })
