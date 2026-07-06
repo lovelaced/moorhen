@@ -11,6 +11,7 @@ import {
 } from '../lib/community'
 import { fetchContributedHours, submitHours } from '../lib/community'
 import { formatOpeningHours, isOpenNow } from '../lib/format-hours'
+import { fetchRiverLevel, type RiverLevel } from '../lib/ea'
 import { fetchHygieneRating, type HygieneRating } from '../lib/hygiene'
 import { day, font, radius, shadow } from '../theme'
 
@@ -33,6 +34,8 @@ export interface SelectedFeature {
   hygieneLookup?: { name: string; point: [number, number] }
   /** Computed from opening hours when the grammar is evaluable. */
   openNow?: boolean
+  /** River navigations: fetch the nearest EA level station live. */
+  riverLevelAt?: [number, number]
   /** Extra buttons (delete a private mooring, retest signal…). */
   actions?: Array<{ label: string; destructive?: boolean; onPress: () => void }>
   /** Place id + point — enables "suggest opening hours". */
@@ -245,6 +248,28 @@ function CommunityStatus({ facilityId, coords }: { facilityId: string; coords: [
   )
 }
 
+function RiverLevelRow({ point }: { point: [number, number] }) {
+  const [level, setLevel] = useState<RiverLevel | null | 'loading'>('loading')
+  useEffect(() => {
+    let cancelled = false
+    fetchRiverLevel(point).then((found) => {
+      if (!cancelled) setLevel(found)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [point])
+  if (level === 'loading' || level === null) return null
+  return (
+    <View style={styles.hygieneRow}>
+      <Feather name="bar-chart-2" size={13} color={day.waterDeep} />
+      <Text style={styles.hygieneText}>
+        River level at {level.station}: {level.levelM.toFixed(2)} m · Environment Agency
+      </Text>
+    </View>
+  )
+}
+
 function HygieneRow({ lookup }: { lookup: { name: string; point: [number, number] } }) {
   const [rating, setRating] = useState<HygieneRating | null | 'loading'>('loading')
   useEffect(() => {
@@ -378,6 +403,7 @@ export function DetailSheet({
           {line}
         </Text>
       ))}
+      {selected.riverLevelAt && <RiverLevelRow point={selected.riverLevelAt} />}
       {selected.hygieneLookup && <HygieneRow lookup={selected.hygieneLookup} />}
       {selected.placeEdit && <SuggestHoursBlock place={selected.placeEdit} />}
       {selected.facilityId && (
@@ -555,10 +581,14 @@ export function selectWaterway(feature: GeoJSON.Feature): SelectedFeature {
   if (Number.isFinite(lengthM) && lengthM > 0) {
     details.push(`${(lengthM / 1609.344).toFixed(1)} mi stretch`)
   }
+  const cls = String(props['class'] ?? '')
+  const isRiver = cls === 'river' || cls === 'tidal-river'
+  const coords = pointOf(feature)
   return {
+    ...(isRiver ? { riverLevelAt: coords } : {}),
     title: (props['name'] as string) || 'Waterway',
     subtitle: classLabels[String(props['class'])] ?? 'Waterway',
     details,
-    coords: pointOf(feature),
+    coords,
   }
 }

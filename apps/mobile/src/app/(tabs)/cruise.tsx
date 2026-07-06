@@ -1,6 +1,8 @@
 import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import * as Linking from 'expo-linking'
+import * as Location from 'expo-location'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MooringCaptureSheet, type MooringCapture } from '../../components/mooring-capture-sheet'
@@ -8,6 +10,7 @@ import { shareMooring } from '../../lib/community'
 import { cruiseStore } from '../../lib/cruise-store'
 import { saveMooring } from '../../lib/moorings-store'
 import { useCruise } from '../../lib/use-cruise'
+import { fetchWeather, type CurrentWeather } from '../../lib/weather'
 import { font, night, radius } from '../../theme'
 
 /**
@@ -18,6 +21,24 @@ import { font, night, radius } from '../../theme'
  * mooring-capture phase.
  */
 export default function CruiseScreen() {
+  const [weather, setWeather] = useState<CurrentWeather | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const position =
+        (await Location.getLastKnownPositionAsync().catch(() => null)) ??
+        (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(
+          () => null,
+        ))
+      if (!position) return
+      const found = await fetchWeather([position.coords.longitude, position.coords.latitude])
+      if (!cancelled) setWeather(found)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const { state, start, stop } = useCruise()
 
   const onSaveMooring = (capture: MooringCapture) => {
@@ -38,6 +59,14 @@ export default function CruiseScreen() {
                   CRUISING{state.waterway ? ` · ${state.waterway}` : ''}
                 </Text>
               </View>
+              {weather && (
+                <View style={styles.pill}>
+                  <MaterialCommunityIcons name="weather-windy" size={15} color={night.trail} />
+                  <Text style={styles.pillText}>
+                    {Math.round(weather.windMph)} mph {weather.windDirection}
+                  </Text>
+                </View>
+              )}
               <View style={styles.pill}>
                 <MaterialCommunityIcons name="speedometer" size={15} color={night.trail} />
                 <Text style={styles.pillText}>
@@ -129,6 +158,13 @@ export default function CruiseScreen() {
               <Feather name="navigation" size={26} color={night.trail} />
             </View>
             <Text style={styles.idleTitle}>Ready to cast off?</Text>
+            {weather && (
+              <Text style={styles.idleWeather}>
+                Wind {Math.round(weather.windMph)} mph {weather.windDirection} ·{' '}
+                {Math.round(weather.tempC)}°C
+                {weather.precipitationMm > 0 ? ' · rain' : ''}
+              </Text>
+            )}
             <Text style={styles.idleBody}>
               Cruise mode tracks you along the cut, locks onto your direction of travel, and warns
               about stoppages ahead — with the last good mooring before them.
@@ -229,6 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   idleTitle: { fontFamily: font.semibold, fontSize: 20, color: night.ink, letterSpacing: -0.3 },
+  idleWeather: { fontFamily: font.medium, fontSize: 13, color: night.ink2 },
   idleBody: {
     fontFamily: font.regular,
     fontSize: 13,
