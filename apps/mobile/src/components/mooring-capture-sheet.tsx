@@ -14,7 +14,7 @@ import { night, font, radius } from '../theme'
  * builds the boater's own map of good moorings and cell coverage.
  */
 
-const EDGE_TYPES = ['Rings', 'Armco', 'Piling', 'Pins', 'Bank'] as const
+const EDGE_TYPES = ['Rings', 'Armco', 'Pins', 'Bank'] as const
 
 export interface MooringCapture {
   point: [number, number]
