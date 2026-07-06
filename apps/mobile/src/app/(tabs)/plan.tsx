@@ -48,7 +48,7 @@ export default function PlanScreen() {
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
   const [mode, setMode] = useState<'route' | 'reach'>('route')
-  const [reachDays, setReachDays] = useState(2)
+  const [reachHours, setReachHours] = useState(7)
   const [reach, setReach] = useState<ReachPoint[] | null>(null)
   const router = useRouter()
 
@@ -68,8 +68,7 @@ export default function PlanScreen() {
     loadGraph()
       .then((graph) => {
         if (cancelled) return
-        const budget = reachDays * hoursPerDay * 3600
-        const frontier = journeyReach(graph, from.point, budget)
+        const frontier = journeyReach(graph, from.point, reachHours * 3600)
         setReach(frontier)
         plannerStore.setReach(frontier)
       })
@@ -77,7 +76,7 @@ export default function PlanScreen() {
     return () => {
       cancelled = true
     }
-  }, [mode, from, reachDays, hoursPerDay])
+  }, [mode, from, reachHours])
 
   const mph = DEFAULT_TIMING_PROFILE.cruiseSpeedMps['narrow-canal'] / 0.44704
 
@@ -123,30 +122,33 @@ export default function PlanScreen() {
           {mode === 'reach' && (
             <View style={styles.reachRow}>
               <Text style={styles.reachLabel}>
-                for {reachDays} day{reachDays === 1 ? '' : 's'} × {hoursPerDay} h
+                for {reachHours} h of cruising
+                {reachHours > hoursPerDay
+                  ? ` (~${Math.ceil(reachHours / hoursPerDay)} days at your pace)`
+                  : ''}
               </Text>
               <Pressable
                 style={styles.paceButton}
                 hitSlop={8}
-                disabled={reachDays <= 1}
-                onPress={() => setReachDays((d) => Math.max(1, d - 1))}
+                disabled={reachHours <= 1}
+                onPress={() => setReachHours((h) => Math.max(1, h - 1))}
               >
                 <Feather
                   name="minus"
                   size={15}
-                  color={reachDays <= 1 ? dayTheme.ink3 : dayTheme.ink}
+                  color={reachHours <= 1 ? dayTheme.ink3 : dayTheme.ink}
                 />
               </Pressable>
               <Pressable
                 style={styles.paceButton}
                 hitSlop={8}
-                disabled={reachDays >= 14}
-                onPress={() => setReachDays((d) => Math.min(14, d + 1))}
+                disabled={reachHours >= 48}
+                onPress={() => setReachHours((h) => Math.min(48, h + 1))}
               >
                 <Feather
                   name="plus"
                   size={15}
-                  color={reachDays >= 14 ? dayTheme.ink3 : dayTheme.ink}
+                  color={reachHours >= 48 ? dayTheme.ink3 : dayTheme.ink}
                 />
               </Pressable>
             </View>
