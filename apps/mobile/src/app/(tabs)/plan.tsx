@@ -9,8 +9,9 @@ import {
 import * as Linking from 'expo-linking'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { MoorhenLoader } from '../../components/moorhen-loader'
 import { SearchModal } from '../../components/search-modal'
 import {
   alertsAvailable,
@@ -193,9 +194,8 @@ export default function PlanScreen() {
         )}
 
         {mode === 'route' && planning && (
-          <View style={[styles.card, shadow.card, styles.planningRow]}>
-            <ActivityIndicator color={dayTheme.green} />
-            <Text style={styles.planningText}>Planning route…</Text>
+          <View style={[styles.card, shadow.card]}>
+            <MoorhenLoader label="Planning your route…" />
           </View>
         )}
 
@@ -406,11 +406,16 @@ function NoticeRow({
   onToggle: () => void
 }) {
   const kind = /restriction/i.test(notice.title) ? 'Restriction' : 'Stoppage'
+  // a "closure" that started over a year ago is a fact of the waterway, not
+  // news — keep it, but quietly
+  const longStanding =
+    notice.start !== null && Date.now() - Date.parse(notice.start) > 365 * 24 * 3600 * 1000
   return (
     <Pressable onPress={onToggle}>
       <View style={styles.noticeHead}>
-        <Text style={styles.warnTitle}>
-          {kind} at mile {(notice.chainageM / 1609.344).toFixed(1)}
+        <Text style={[styles.warnTitle, longStanding && styles.warnTitleMuted]}>
+          {longStanding ? 'Long-standing restriction' : kind} at mile{' '}
+          {(notice.chainageM / 1609.344).toFixed(1)}
         </Text>
         <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={dayTheme.ink3} />
       </View>
@@ -584,6 +589,7 @@ const styles = StyleSheet.create({
   },
   warnCol: { flex: 1, gap: 6 },
   warnTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
+  warnTitleMuted: { color: dayTheme.ink3 },
   noticeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.green, marginTop: 2 },
   warnBody: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2, lineHeight: 17 },

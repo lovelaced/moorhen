@@ -10,11 +10,21 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import '../lib/cruise-task'
+import { loadPlacesIndex } from '../lib/places-index'
 import { day } from '../theme'
 
 SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
+  // pre-warm the search index so first search is instant (persisted after
+  // first build, so this is a local file read on every later launch)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadPlacesIndex().catch(() => {})
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
   const [fontsLoaded] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,

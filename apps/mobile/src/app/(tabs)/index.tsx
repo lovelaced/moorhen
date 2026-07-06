@@ -9,6 +9,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMoorings } from '../../lib/artifacts'
 import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
+import { MoorhenLoader } from '../../components/moorhen-loader'
 import { NearMeSheet, type Nearest } from '../../components/near-me-sheet'
 import { PhotoPin } from '../../components/photo-pin'
 import { RouteStopsSheet } from '../../components/route-stops-sheet'
@@ -1090,7 +1091,7 @@ export default function MapScreen() {
         )}
         {planning && (
           <View style={[styles.routeCard, shadow.card]}>
-            <Text style={styles.routeTitle}>Planning route…</Text>
+            <MoorhenLoader label="Planning your route…" />
           </View>
         )}
         {plannerOpen && fromEntry && toEntry && !planning && !route && (
@@ -1246,6 +1247,7 @@ export default function MapScreen() {
 
       {captureAt && (
         <MooringCaptureSheet
+          appearance="day"
           point={captureAt}
           onSave={(capture) => {
             void saveMooring(capture)

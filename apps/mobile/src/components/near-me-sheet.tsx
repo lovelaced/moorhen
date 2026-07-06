@@ -1,8 +1,9 @@
 import Feather from '@expo/vector-icons/Feather'
+import { MoorhenLoader } from './moorhen-loader'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import * as Location from 'expo-location'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { getFacilities, getMoorings, getPois } from '../lib/artifacts'
 import { day, font, radius, shadow } from '../theme'
 
@@ -224,12 +225,7 @@ export function NearMeSheet({
         </Pressable>
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
-      {!results && !error && (
-        <View style={styles.loading}>
-          <ActivityIndicator color={day.green} />
-          <Text style={styles.loadingText}>Finding what's around you…</Text>
-        </View>
-      )}
+      {!results && !error && <MoorhenLoader label="Finding what's around you…" />}
       {results && (
         <FlatList
           data={rows}

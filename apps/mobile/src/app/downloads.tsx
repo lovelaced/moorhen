@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import { MoorhenLoader } from '../components/moorhen-loader'
 import { Stack } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -30,7 +31,7 @@ export default function DownloadsScreen() {
         {regions.map((region) => (
           <RegionRow key={region.id} region={region} />
         ))}
-        {regions.length === 0 && <Text style={styles.empty}>Loading regions…</Text>}
+        {regions.length === 0 && <MoorhenLoader label="Loading regions…" />}
       </ScrollView>
     </SafeAreaView>
   )

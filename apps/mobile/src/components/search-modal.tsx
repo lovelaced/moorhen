@@ -1,16 +1,8 @@
 import Feather from '@expo/vector-icons/Feather'
+import { MoorhenLoader } from './moorhen-loader'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useEffect, useMemo, useState } from 'react'
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { loadPlacesIndex, type PlaceEntry } from '../lib/places-index'
 import { day, font, radius } from '../theme'
@@ -92,12 +84,7 @@ export function SearchModal({
             <Feather name="x" size={20} color={day.ink2} />
           </Pressable>
         </View>
-        {!index && (
-          <View style={styles.loading}>
-            <ActivityIndicator color={day.green} />
-            <Text style={styles.loadingText}>Loading the network…</Text>
-          </View>
-        )}
+        {!index && <MoorhenLoader label="Loading the network…" />}
         <FlatList
           data={results}
           keyExtractor={(entry, i) => `${entry.name}-${i}`}

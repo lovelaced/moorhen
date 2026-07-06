@@ -2,10 +2,10 @@ import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Network from 'expo-network'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import { communityConfigured } from '../lib/community'
-import { night, font, radius } from '../theme'
+import { day, night, font, radius } from '../theme'
 
 /**
  * Moored-up capture: one-tap speed test + photo, plus quick edge-type chips.
@@ -15,6 +15,31 @@ import { night, font, radius } from '../theme'
  */
 
 const EDGE_TYPES = ['Rings', 'Armco', 'Pins', 'Bank'] as const
+
+/**
+ * The sheet is used in two lights: night-styled on the Cruise screen (its
+ * home), day-styled when opened from the map's anchor FAB in daylight.
+ */
+const PALETTES = {
+  night: {
+    surface: night.surface,
+    bg: night.bg,
+    border: night.border,
+    ink: night.ink,
+    ink2: night.ink2,
+    accent: night.trail,
+  },
+  day: {
+    surface: day.surface,
+    bg: day.surfaceMuted,
+    border: '#E5E2DA',
+    ink: day.ink,
+    ink2: day.ink2,
+    accent: day.greenDark,
+  },
+} as const
+
+export type CaptureAppearance = keyof typeof PALETTES
 
 export interface MooringCapture {
   point: [number, number]
@@ -60,11 +85,15 @@ export function MooringCaptureSheet({
   point,
   onSave,
   onDismiss,
+  appearance = 'night',
 }: {
   point: [number, number]
   onSave: (capture: MooringCapture) => void
   onDismiss: () => void
+  appearance?: CaptureAppearance
 }) {
+  const palette = PALETTES[appearance]
+  const styles = useMemo(() => makeStyles(palette), [palette])
   const [edgeType, setEdgeType] = useState<string | null>(null)
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [speed, setSpeed] = useState<SpeedResult | null>(null)
@@ -101,7 +130,7 @@ export function MooringCaptureSheet({
           <Text style={styles.subtitle}>Log this spot — private to you</Text>
         </View>
         <Pressable onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={20} color={night.ink2} />
+          <Feather name="x" size={20} color={palette.ink2} />
         </Pressable>
       </View>
 
@@ -115,7 +144,7 @@ export function MooringCaptureSheet({
             <MaterialCommunityIcons
               name={stars !== null && value <= stars ? 'star' : 'star-outline'}
               size={26}
-              color={stars !== null && value <= stars ? '#E8B830' : night.ink2}
+              color={stars !== null && value <= stars ? '#E8B830' : palette.ink2}
             />
           </Pressable>
         ))}
@@ -139,9 +168,9 @@ export function MooringCaptureSheet({
       <View style={styles.actions}>
         <Pressable style={styles.action} onPress={test} disabled={testing}>
           {testing ? (
-            <ActivityIndicator color={night.trail} />
+            <ActivityIndicator color={palette.accent} />
           ) : (
-            <Feather name="wifi" size={20} color={night.trail} />
+            <Feather name="wifi" size={20} color={palette.accent} />
           )}
           <Text style={styles.actionText}>
             {speed
@@ -155,7 +184,7 @@ export function MooringCaptureSheet({
           {photoUri ? (
             <Image source={{ uri: photoUri }} style={styles.thumb} />
           ) : (
-            <Feather name="camera" size={20} color={night.trail} />
+            <Feather name="camera" size={20} color={palette.accent} />
           )}
           <Text style={styles.actionText}>{photoUri ? 'Photo added' : 'Add photo'}</Text>
         </Pressable>
@@ -184,67 +213,70 @@ export function MooringCaptureSheet({
   )
 }
 
-const styles = StyleSheet.create({
-  sheet: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
-    backgroundColor: night.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: night.border,
-    padding: 16,
-    gap: 10,
-  },
-  header: { flexDirection: 'row', alignItems: 'flex-start' },
-  headerText: { flex: 1, gap: 2 },
-  title: { fontFamily: font.semibold, fontSize: 18, color: night.ink, letterSpacing: -0.2 },
-  subtitle: { fontFamily: font.regular, fontSize: 12, color: night.ink2 },
-  label: { fontFamily: font.medium, fontSize: 12, color: night.ink2, marginTop: 2 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: {
-    height: 32,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-    backgroundColor: night.bg,
-    borderWidth: 1,
-    borderColor: night.border,
-  },
-  chipActive: { backgroundColor: '#2E6B45', borderColor: '#2E6B45' },
-  chipText: { fontFamily: font.medium, fontSize: 13, color: night.ink2 },
-  chipTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  action: {
-    flex: 1,
-    minHeight: 72,
-    borderRadius: radius.control,
-    backgroundColor: night.bg,
-    borderWidth: 1,
-    borderColor: night.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: 10,
-  },
-  actionText: { fontFamily: font.semibold, fontSize: 12, color: night.ink, textAlign: 'center' },
-  actionMeta: { fontFamily: font.regular, fontSize: 11, color: night.ink2 },
-  thumb: { width: 28, height: 28, borderRadius: 6 },
-  starsRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
-  shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  shareText: { flex: 1, gap: 1 },
-  shareTitle: { fontFamily: font.medium, fontSize: 13, color: night.ink },
-  shareMeta: { fontFamily: font.regular, fontSize: 11, color: night.ink2 },
-  save: {
-    marginTop: 4,
-    height: 48,
-    borderRadius: radius.control,
-    backgroundColor: '#2E6B45',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  saveText: { fontFamily: font.semibold, fontSize: 15, color: '#FFFFFF' },
-})
+type Palette = (typeof PALETTES)[CaptureAppearance]
+
+const makeStyles = (p: Palette) =>
+  StyleSheet.create({
+    sheet: {
+      position: 'absolute',
+      left: 12,
+      right: 12,
+      bottom: 12,
+      backgroundColor: p.surface,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: p.border,
+      padding: 16,
+      gap: 10,
+    },
+    header: { flexDirection: 'row', alignItems: 'flex-start' },
+    headerText: { flex: 1, gap: 2 },
+    title: { fontFamily: font.semibold, fontSize: 18, color: p.ink, letterSpacing: -0.2 },
+    subtitle: { fontFamily: font.regular, fontSize: 12, color: p.ink2 },
+    label: { fontFamily: font.medium, fontSize: 12, color: p.ink2, marginTop: 2 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chip: {
+      height: 32,
+      borderRadius: radius.pill,
+      paddingHorizontal: 14,
+      justifyContent: 'center',
+      backgroundColor: p.bg,
+      borderWidth: 1,
+      borderColor: p.border,
+    },
+    chipActive: { backgroundColor: '#2E6B45', borderColor: '#2E6B45' },
+    chipText: { fontFamily: font.medium, fontSize: 13, color: p.ink2 },
+    chipTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
+    actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    action: {
+      flex: 1,
+      minHeight: 72,
+      borderRadius: radius.control,
+      backgroundColor: p.bg,
+      borderWidth: 1,
+      borderColor: p.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      padding: 10,
+    },
+    actionText: { fontFamily: font.semibold, fontSize: 12, color: p.ink, textAlign: 'center' },
+    actionMeta: { fontFamily: font.regular, fontSize: 11, color: p.ink2 },
+    thumb: { width: 28, height: 28, borderRadius: 6 },
+    starsRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+    shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
+    shareText: { flex: 1, gap: 1 },
+    shareTitle: { fontFamily: font.medium, fontSize: 13, color: p.ink },
+    shareMeta: { fontFamily: font.regular, fontSize: 11, color: p.ink2 },
+    save: {
+      marginTop: 4,
+      height: 48,
+      borderRadius: radius.control,
+      backgroundColor: '#2E6B45',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    saveText: { fontFamily: font.semibold, fontSize: 15, color: '#FFFFFF' },
+  })
