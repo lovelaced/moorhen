@@ -57,6 +57,7 @@ export interface PlannedRoute {
   durationLabel: string
   cruisingDays: number
   days: JourneyDay[]
+  waterways: string[]
 }
 
 export function planRoute(
@@ -76,5 +77,6 @@ export function planRoute(
     durationLabel: formatJourneyDuration(journey.totalSeconds, profile),
     cruisingDays: journey.cruisingDays,
     days: journey.days,
+    waterways: journey.waterways,
   }
 }

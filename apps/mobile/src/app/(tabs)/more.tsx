@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { Link } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { alertsAvailable, unsubscribeWaterway, useAlertSubscriptions } from '../../lib/alerts'
 import { setBoat, useBoat } from '../../lib/boat-store'
 import { day, font, radius, shadow } from '../../theme'
 
@@ -50,6 +51,8 @@ export default function MoreScreen() {
           <BoatRow label="Beam" unit="ft" field="beamFt" step={0.1} />
         </View>
 
+        <AlertsCard />
+
         <View style={[styles.card, shadow.card]}>
           <Text style={styles.sectionTitle}>Data sources & thanks</Text>
           {ATTRIBUTIONS.map((line) => (
@@ -68,6 +71,28 @@ export default function MoreScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  )
+}
+
+function AlertsCard() {
+  const subscriptions = useAlertSubscriptions()
+  if (!alertsAvailable() || subscriptions.length === 0) return null
+  return (
+    <View style={[styles.card, shadow.card]}>
+      <Text style={styles.sectionTitle}>Stoppage alerts</Text>
+      <Text style={styles.attribution}>
+        Push notifications for navigation closures on these waterways.
+      </Text>
+      {subscriptions.map((name) => (
+        <View key={name} style={styles.alertRow}>
+          <Feather name="bell" size={14} color={day.greenDark} />
+          <Text style={styles.alertName}>{name}</Text>
+          <Pressable hitSlop={8} onPress={() => void unsubscribeWaterway(name)}>
+            <Feather name="x" size={16} color={day.ink3} />
+          </Pressable>
+        </View>
+      ))}
+    </View>
   )
 }
 
@@ -109,6 +134,8 @@ function BoatRow({
 }
 
 const styles = StyleSheet.create({
+  alertRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  alertName: { fontFamily: font.medium, fontSize: 14, color: day.ink, flex: 1 },
   boatRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   boatLabel: { fontFamily: font.medium, fontSize: 14, color: day.ink, width: 64 },
   boatValue: { fontFamily: font.semibold, fontSize: 14, color: day.ink, flex: 1 },

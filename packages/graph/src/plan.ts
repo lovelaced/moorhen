@@ -127,6 +127,8 @@ export interface PlannedJourney {
   cruisingDays: number
   /** The journey split into days of profile.cruisingHoursPerDay. */
   days: JourneyDay[]
+  /** Unique waterway names along the route, in travel order. */
+  waterways: string[]
 }
 
 function summarize(
@@ -137,12 +139,14 @@ function summarize(
   let narrowLocks = 0
   let broadLocks = 0
   let distanceM = 0
+  const waterways: string[] = []
   for (const { edge, forward } of legs) {
     const geometry = forward ? edge.geometry : [...edge.geometry].reverse()
     line.push(...(line.length > 0 ? geometry.slice(1) : geometry))
     narrowLocks += edge.narrowLocks
     broadLocks += edge.broadLocks
     distanceM += edge.lengthM
+    if (edge.name && !waterways.includes(edge.name)) waterways.push(edge.name)
   }
   const estimate = estimateJourney(
     legs.map(({ edge }) => ({ edge: edgeToTimingEdge(edge), direction: 1 as const })),
@@ -156,6 +160,7 @@ function summarize(
     totalSeconds: estimate.totalSeconds,
     cruisingDays: estimate.cruisingDays,
     days: splitIntoDays(legs, profile),
+    waterways,
   }
 }
 

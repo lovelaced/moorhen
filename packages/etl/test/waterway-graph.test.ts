@@ -280,3 +280,13 @@ describe('journeyReach', () => {
     expect(threeHours[0]!.distanceM).toBeGreaterThan(oneHour[0]!.distanceM)
   })
 })
+
+describe('planJourney waterways', () => {
+  it('lists unique waterway names along the route', async () => {
+    const { planJourney } = await import('@moorhen/graph')
+    const journey = planJourney(graph, [-1.24, 52.277], [-1.16, 52.288])!
+    expect(journey.waterways.length).toBeGreaterThan(0)
+    expect(journey.waterways).toContain('Grand Union Canal')
+    expect(new Set(journey.waterways).size).toBe(journey.waterways.length)
+  })
+})

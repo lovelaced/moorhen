@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SearchModal } from '../../components/search-modal'
+import { alertsAvailable, subscribeWaterways } from '../../lib/alerts'
 import { boatWarnings, useBoat } from '../../lib/boat-store'
 import {
   bestFrontierName,
@@ -31,6 +32,7 @@ import { day as dayTheme, font, radius, shadow } from '../../theme'
 export default function PlanScreen() {
   const { from, to, route, planning, stops, routeNotices, hoursPerDay } = usePlanner()
   const boat = useBoat()
+  const [alerted, setAlerted] = useState(false)
   const warnings = route ? boatWarnings(boat, route.narrowLocks, route.broadLocks) : []
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
@@ -222,6 +224,22 @@ export default function PlanScreen() {
                 <Feather name="map" size={15} color="#FFFFFF" />
                 <Text style={styles.mapButtonText}>View on map</Text>
               </Pressable>
+              {alertsAvailable() && route.waterways.length > 0 && (
+                <Pressable
+                  style={styles.alertButton}
+                  onPress={async () => {
+                    const ok = await subscribeWaterways(route.waterways)
+                    setAlerted(ok)
+                  }}
+                >
+                  <Feather name="bell" size={14} color={dayTheme.greenDark} />
+                  <Text style={styles.alertButtonText}>
+                    {alerted
+                      ? 'Alerts on for this route'
+                      : `Alert me about stoppages (${route.waterways.join(', ')})`}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             {warnings.length > 0 && (
@@ -482,6 +500,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mapButtonText: { fontFamily: font.semibold, fontSize: 14, color: '#FFFFFF' },
+  alertButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: radius.control,
+    backgroundColor: dayTheme.greenSoft,
+  },
+  alertButtonText: {
+    fontFamily: font.semibold,
+    fontSize: 12,
+    color: dayTheme.greenDark,
+    flexShrink: 1,
+  },
   sectionTitle: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink, marginTop: 4 },
   warnCard: {
     backgroundColor: dayTheme.amberSoft,
