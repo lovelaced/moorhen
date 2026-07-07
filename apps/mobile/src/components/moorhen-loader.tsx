@@ -253,7 +253,10 @@ export function MoorhenLoader({ label, size = 44 }: { label?: string; size?: num
 
   return (
     <View style={styles.row}>
-      <Svg width={(size * 300) / 390} height={size} viewBox="120 100 300 390">
+      {/* the full stride envelope: the backward kick streams to x≈7 and the
+          head-pump pushes the beak past x≈450, so the box is much wider than
+          the resting pose */}
+      <Svg width={(size * 464) / 348} height={size} viewBox="0 138 464 348">
         <Defs>
           <ClipPath id="mh-body-clip">
             <Path d={BODY} />
