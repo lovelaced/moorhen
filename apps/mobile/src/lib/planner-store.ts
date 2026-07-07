@@ -24,6 +24,8 @@ export interface PlannerState {
   hoursPerDay: number
   /** "How far can I get?" frontier — drawn on the map as flags. */
   reach: ReachPoint[] | null
+  /** Bumped by "Show reach on map" so the map fits the flags in view. */
+  reachFocus: number
 }
 
 type Listener = () => void
@@ -40,6 +42,7 @@ class PlannerStore {
     routeNotices: null,
     hoursPerDay: 7,
     reach: null,
+    reachFocus: 0,
   }
   private listeners = new Set<Listener>()
   private planGeneration = 0
@@ -92,6 +95,10 @@ class PlannerStore {
 
   setReach(reach: ReachPoint[] | null): void {
     this.patch({ reach })
+  }
+
+  focusReach(): void {
+    this.patch({ reachFocus: this.state.reachFocus + 1 })
   }
 
   adjustPace(delta: number): void {

@@ -188,9 +188,21 @@ export default function PlanScreen() {
           </View>
         </View>
 
+        {mode === 'reach' && from && (!reach || !places) && (
+          <View style={[styles.card, shadow.card]}>
+            <MoorhenLoader label="Working out how far you can get…" />
+          </View>
+        )}
+
         {mode === 'reach' && reach && places && (
           <>
-            <Pressable style={styles.mapButton} onPress={() => router.navigate('/')}>
+            <Pressable
+              style={styles.mapButton}
+              onPress={() => {
+                plannerStore.focusReach()
+                router.navigate('/')
+              }}
+            >
               <Feather name="map" size={15} color="#FFFFFF" />
               <Text style={styles.mapButtonText}>Show reach on map</Text>
             </Pressable>

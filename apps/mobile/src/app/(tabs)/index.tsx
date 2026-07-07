@@ -5,7 +5,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Location from 'expo-location'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMoorings } from '../../lib/artifacts'
 import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
@@ -25,6 +25,7 @@ import {
 } from '../../lib/moorings-store'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
 import { boatWarnings, useBoat } from '../../lib/boat-store'
+import { loadPlacesIndex, nearestNamed, type PlaceEntry } from '../../lib/places-index'
 import { plannerStore, usePlanner } from '../../lib/planner-store'
 import type { RouteStop } from '../../lib/route-stops'
 import {
@@ -179,6 +180,21 @@ interface NoticesFile {
   }>
 }
 
+// dropped pins read like a boater would say it ("Near Braunston Turn"),
+// falling back to a plain pin when nothing named is within 3 km
+let placeSnapshot: PlaceEntry[] | null = null
+function droppedPin(point: [number, number]): SearchEntry {
+  const near = placeSnapshot ? nearestNamed(placeSnapshot, point) : null
+  if (near) {
+    const dLat = (near.point[1] - point[1]) * 111_320
+    const dLon = (near.point[0] - point[0]) * 111_320 * Math.cos((point[1] * Math.PI) / 180)
+    if (Math.hypot(dLat, dLon) < 3000) {
+      return { name: `Near ${near.name}`, kind: 'Map point', point }
+    }
+  }
+  return { name: 'Dropped pin', kind: 'Map point', point }
+}
+
 export default function MapScreen() {
   const [selected, setSelected] = useState<SelectedFeature | null>(null)
   const [active, setActive] = useState<Set<ChipKey>>(new Set(['moorings', 'water']))
@@ -186,8 +202,13 @@ export default function MapScreen() {
   const [stoppages, setStoppages] = useState<GeoJSON.FeatureCollection | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [plannerOpen, setPlannerOpen] = useState(false)
+  // mirrored into a ref so the stable feature-press handlers see fresh state
+  const plannerOpenRef = useRef(false)
+  useEffect(() => {
+    plannerOpenRef.current = plannerOpen
+  }, [plannerOpen])
   const [searchTarget, setSearchTarget] = useState<'place' | 'from' | 'to'>('place')
-  const [routeStart, setRouteStart] = useState<[number, number] | null>(null)
+  const [mapReady, setMapReady] = useState(false)
   const [stopsOpen, setStopsOpen] = useState(false)
   const [nearMeOpen, setNearMeOpen] = useState(false)
   const [captureAt, setCaptureAt] = useState<[number, number] | null>(null)
@@ -200,6 +221,7 @@ export default function MapScreen() {
     routeNotices,
     hoursPerDay,
     reach,
+    reachFocus,
   } = usePlanner()
   const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
@@ -284,39 +306,80 @@ export default function MapScreen() {
     })
   }, [])
 
+  const fillEndpoint = useCallback((entry: SearchEntry) => {
+    const state = plannerStore.getState()
+    if (!state.from) plannerStore.setEndpoint('from', entry)
+    else plannerStore.setEndpoint('to', entry)
+    setPlannerOpen(true)
+  }, [])
+
+  const setEndpointAt = useCallback(
+    (point: [number, number]) => fillEndpoint(droppedPin(point)),
+    [fillEndpoint],
+  )
+
   const onFeaturePress = useCallback(
     (select: (feature: GeoJSON.Feature) => SelectedFeature) => (event: FeaturePress) => {
       const feature = event.nativeEvent.features[0]
-      if (feature) {
-        // without this the event bubbles to Map.onPress, which clears the selection
-        event.stopPropagation()
-        setSelected(select(feature))
+      if (!feature) return
+      // without this the event bubbles to Map.onPress, which clears the selection
+      event.stopPropagation()
+      // with the planner waiting for an endpoint, taps feed the planner —
+      // a named point (lock, junction, pub) becomes the endpoint by name,
+      // a waterway line becomes a pin where the finger landed
+      const state = plannerStore.getState()
+      if (plannerOpenRef.current && (!state.from || !state.to)) {
+        if (feature.geometry.type === 'Point') {
+          const point = feature.geometry.coordinates as [number, number]
+          const name = (feature.properties?.['name'] as string) || null
+          fillEndpoint(name ? { name, kind: 'Map point', point } : droppedPin(point))
+          return
+        }
+        const raw = (
+          event.nativeEvent as {
+            lngLat?: [number, number] | { lng: number; lat: number }
+          }
+        ).lngLat
+        if (raw) {
+          fillEndpoint(droppedPin(Array.isArray(raw) ? [raw[0], raw[1]] : [raw.lng, raw.lat]))
+          return
+        }
       }
+      setSelected(select(feature))
     },
-    [],
+    [fillEndpoint],
+  )
+
+  // a map press fills the next empty planner slot: start first, then
+  // destination; with both set, a long-press moves the destination. Nothing
+  // here ever clears a route — that takes the explicit (confirmed) clear.
+  const pressPoint = (
+    event: NativeSyntheticEvent<{ lngLat?: [number, number] | { lng: number; lat: number } }>,
+  ): [number, number] | null => {
+    const raw = event.nativeEvent.lngLat
+    if (!raw) return null
+    return Array.isArray(raw) ? [raw[0], raw[1]] : [raw.lng, raw.lat]
+  }
+
+  const onMapPress = useCallback(
+    (event: NativeSyntheticEvent<{ lngLat?: [number, number] | { lng: number; lat: number } }>) => {
+      const point = pressPoint(event)
+      const state = plannerStore.getState()
+      if (point && plannerOpen && (!state.from || !state.to)) {
+        setEndpointAt(point)
+        return
+      }
+      setSelected(null)
+    },
+    [plannerOpen, setEndpointAt],
   )
 
   const onLongPress = useCallback(
-    async (
-      event: NativeSyntheticEvent<{ lngLat: [number, number] | { lng: number; lat: number } }>,
-    ) => {
-      const raw = event.nativeEvent.lngLat
-      const point: [number, number] = Array.isArray(raw) ? [raw[0], raw[1]] : [raw.lng, raw.lat]
-      if (route || (!routeStart && !planning)) {
-        plannerStore.clear()
-        setRouteStart(point)
-        return
-      }
-      if (!routeStart || planning) return
-      plannerStore.setEndpoint('from', {
-        name: 'Dropped pin',
-        kind: 'Map point',
-        point: routeStart,
-      })
-      plannerStore.setEndpoint('to', { name: 'Dropped pin', kind: 'Map point', point })
-      setRouteStart(null)
+    (event: NativeSyntheticEvent<{ lngLat?: [number, number] | { lng: number; lat: number } }>) => {
+      const point = pressPoint(event)
+      if (point) setEndpointAt(point)
     },
-    [route, routeStart, planning],
+    [setEndpointAt],
   )
 
   const onSearchSelect = useCallback(
@@ -366,6 +429,39 @@ export default function MapScreen() {
     if (!route) setStopsOpen(false)
   }, [route])
 
+  // "Show reach on map" — fit every frontier flag in view at once
+  useEffect(() => {
+    if (reachFocus === 0) return
+    const state = plannerStore.getState()
+    const points = (state.reach ?? []).map((r) => r.point as [number, number])
+    if (state.from) points.push(state.from.point)
+    if (points.length === 0) return
+    let west = Infinity
+    let south = Infinity
+    let east = -Infinity
+    let north = -Infinity
+    for (const [lon, lat] of points) {
+      west = Math.min(west, lon)
+      east = Math.max(east, lon)
+      south = Math.min(south, lat)
+      north = Math.max(north, lat)
+    }
+    setPlannerOpen(false) // give the frontier the full canvas
+    cameraRef.current?.fitBounds([west, south, east, north], {
+      padding: { top: 210, right: 60, bottom: 130, left: 60 },
+      duration: 900,
+    })
+  }, [reachFocus])
+
+  // names for dropped pins come from the shared places index
+  useEffect(() => {
+    loadPlacesIndex()
+      .then((entries) => {
+        placeSnapshot = entries
+      })
+      .catch(() => {})
+  }, [])
+
   // the two bottom drawers swap instead of stacking: opening a detail slides
   // the places sheet down; closing it brings the sheet back
   const stopsSlide = useRef(new Animated.Value(0)).current
@@ -377,9 +473,18 @@ export default function MapScreen() {
     }).start()
   }, [selected, stopsSlide])
 
-  const clearPlanner = useCallback(() => {
-    setPlannerOpen(false)
-    plannerStore.clear()
+  const confirmClear = useCallback(() => {
+    Alert.alert('Clear this route?', 'Start, destination and the planned line will be removed.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          plannerStore.clear()
+          setPlannerOpen(false)
+        },
+      },
+    ])
   }, [])
 
   const onStopSelect = useCallback((stop: RouteStop) => {
@@ -421,16 +526,16 @@ export default function MapScreen() {
         properties: { part: 'line' },
       })
     }
-    if (routeStart) {
+    if (!route && fromEntry) {
       features.push({
         type: 'Feature',
-        geometry: { type: 'Point', coordinates: routeStart },
+        geometry: { type: 'Point', coordinates: fromEntry.point },
         properties: { part: 'start' },
       })
     }
     if (features.length === 0) return null
     return { type: 'FeatureCollection', features }
-  }, [route, routeStart])
+  }, [route, fromEntry])
 
   const locateMe = useCallback(async () => {
     const permission = await Location.requestForegroundPermissionsAsync()
@@ -497,8 +602,9 @@ export default function MapScreen() {
         <MapLibre.Map
           style={StyleSheet.absoluteFill}
           mapStyle={offlineStyle ?? 'https://tiles.openfreemap.org/styles/liberty'}
-          onPress={() => setSelected(null)}
+          onPress={onMapPress}
           onLongPress={onLongPress}
+          onDidFinishLoadingMap={() => setMapReady(true)}
           compass={true}
           compassPosition={{ top: 118, right: 10 }}
         >
@@ -1083,7 +1189,12 @@ export default function MapScreen() {
               <Pressable onPress={() => plannerStore.swap()} hitSlop={10}>
                 <Feather name="repeat" size={17} color={day.ink2} />
               </Pressable>
-              <Pressable onPress={clearPlanner} hitSlop={10}>
+              {(fromEntry || toEntry) && (
+                <Pressable onPress={confirmClear} hitSlop={10}>
+                  <Feather name="trash-2" size={16} color={day.ink3} />
+                </Pressable>
+              )}
+              <Pressable onPress={() => setPlannerOpen(false)} hitSlop={10}>
                 <Feather name="x" size={18} color={day.ink3} />
               </Pressable>
             </View>
@@ -1094,14 +1205,21 @@ export default function MapScreen() {
             <MoorhenLoader label="Planning your route…" />
           </View>
         )}
+        {!mapReady && MapLibre && (
+          <View style={[styles.mapLoadingPill, shadow.card]}>
+            <MoorhenLoader size={30} label="Loading the map…" />
+          </View>
+        )}
         {plannerOpen && fromEntry && toEntry && !planning && !route && (
           <View style={[styles.routeCard, shadow.card]}>
             <Text style={styles.routeHint}>No route found between those places</Text>
           </View>
         )}
-        {!planning && routeStart && !route && (
+        {plannerOpen && fromEntry && !toEntry && !planning && (
           <View style={[styles.routeCard, shadow.card]}>
-            <Text style={styles.routeHint}>Start set — long-press your destination</Text>
+            <Text style={styles.routeHint}>
+              Start set — tap the map or search for a destination
+            </Text>
           </View>
         )}
         {route && (
@@ -1132,6 +1250,7 @@ export default function MapScreen() {
                   </Text>
                 </Pressable>
               )}
+              {!stops && <MoorhenLoader size={26} label="Finding canalside places…" />}
               <View style={styles.paceRow}>
                 <Text style={styles.paceLabel}>at {hoursPerDay} h cruising per day</Text>
                 <Pressable
@@ -1152,7 +1271,7 @@ export default function MapScreen() {
                 </Pressable>
               </View>
             </View>
-            <Pressable onPress={() => plannerStore.clear()} hitSlop={12}>
+            <Pressable onPress={confirmClear} hitSlop={12}>
               <Feather name="x" size={18} color={day.ink3} />
             </Pressable>
           </View>
@@ -1191,7 +1310,7 @@ export default function MapScreen() {
       </Pressable>
       <Pressable
         style={[styles.routeButton, shadow.pill, plannerOpen && styles.routeButtonActive]}
-        onPress={() => (plannerOpen ? clearPlanner() : setPlannerOpen(true))}
+        onPress={() => setPlannerOpen((open) => !open)}
       >
         <Feather
           name={plannerOpen ? 'x' : 'corner-up-right'}
@@ -1316,6 +1435,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipsRow: { gap: 8, paddingRight: 16 },
+  mapLoadingPill: {
+    position: 'absolute',
+    bottom: 92,
+    alignSelf: 'center',
+    backgroundColor: day.surface,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+  },
   routeCard: {
     backgroundColor: day.surface,
     borderRadius: radius.card,

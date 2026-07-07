@@ -292,16 +292,59 @@ export interface ReachPoint {
 }
 
 /**
+ * Dead-end branches shorter than `maxM`: every edge on the walk from a
+ * degree-1 tip back to the first junction. Frontier points landing on these
+ * stubs (marina entrances, feeder arms) aren't meaningful "furthest points".
+ */
+function shortArms(
+  graph: WaterwayGraph,
+  maxM: number,
+): { edges: Set<WaterwayEdge>; tips: Set<number> } {
+  const adjacency = new Map<number, WaterwayEdge[]>()
+  for (const edge of graph.edges) {
+    for (const v of [edge.a, edge.b]) {
+      const list = adjacency.get(v)
+      if (list) list.push(edge)
+      else adjacency.set(v, [edge])
+    }
+  }
+  const edges = new Set<WaterwayEdge>()
+  const tips = new Set<number>()
+  for (const [tip, list] of adjacency) {
+    if (list.length !== 1) continue
+    const arm: WaterwayEdge[] = []
+    let vertex = tip
+    let along = list[0]!
+    let lengthM = 0
+    while (lengthM < maxM) {
+      arm.push(along)
+      lengthM += along.lengthM
+      vertex = along.a === vertex ? along.b : along.a
+      const onward = (adjacency.get(vertex) ?? []).filter((e) => e !== along)
+      if (onward.length !== 1) break // a junction (or another dead end) ends the arm
+      along = onward[0]!
+    }
+    if (lengthM < maxM) {
+      tips.add(tip)
+      for (const e of arm) edges.add(e)
+    }
+  }
+  return { edges, tips }
+}
+
+/**
  * How far can the boat get from `from` in `budgetSeconds` of cruising?
  * Time-weighted Dijkstra from the snapped start; the frontier is every point
  * where the budget runs out mid-edge, plus any terminus reached with time to
- * spare. This is the "2 days × 7 h" planning view.
+ * spare. This is the "2 days × 7 h" planning view. Frontier points on
+ * dead-end arms shorter than `minArmM` are dropped as noise.
  */
 export function journeyReach(
   graph: WaterwayGraph,
   from: LonLat,
   budgetSeconds: number,
   profile: TimingProfile = DEFAULT_TIMING_PROFILE,
+  minArmM = 1000,
 ): ReachPoint[] {
   const start = snapToNetwork(graph, from)
   if (!start) return []
@@ -316,6 +359,8 @@ export function journeyReach(
   const timeWeight = (edge: WaterwayEdge) =>
     edgeTraversalSeconds(edgeToTimingEdge(edge), 1, profile)
   const { costs, distances } = dijkstraCosts(augmented, VIRTUAL_START, timeWeight)
+  // arm detection uses the raw graph so the virtual start edges don't distort degrees
+  const stubs = shortArms(graph, minArmM)
 
   const frontier: ReachPoint[] = []
   const degree = new Map<number, number>()
@@ -335,6 +380,7 @@ export function journeyReach(
       const exitCost = costs.get(exitVertex) ?? Infinity
       // budget dies inside this edge travelling entry→exit, and the far end
       // isn't reached more cheaply another way
+      if (stubs.edges.has(edge)) continue
       if (entryCost + seconds > budgetSeconds && exitCost > budgetSeconds) {
         const fraction = seconds === 0 ? 1 : (budgetSeconds - entryCost) / seconds
         const geometry = forward ? edge.geometry : [...edge.geometry].reverse()
@@ -350,6 +396,7 @@ export function journeyReach(
   // termini reached with time to spare are destinations too
   for (const [vertex, cost] of costs) {
     if (vertex === VIRTUAL_START || cost > budgetSeconds) continue
+    if (stubs.tips.has(vertex)) continue
     if ((degree.get(vertex) ?? 0) === 1) {
       const edge = augmented.edges.find((e) => e.a === vertex || e.b === vertex)
       if (!edge) continue
@@ -357,6 +404,13 @@ export function journeyReach(
       frontier.push({ point, distanceM: distances.get(vertex) ?? 0, seconds: cost })
     }
   }
-  frontier.sort((a, b) => b.distanceM - a.distanceM)
-  return frontier
+  // the virtual start edges shadow the snapped edge, so a budget dying there
+  // yields the same point twice — keep one flag per spot
+  const seen = new Map<string, ReachPoint>()
+  for (const p of frontier) {
+    const key = `${p.point[0].toFixed(5)},${p.point[1].toFixed(5)}`
+    const prior = seen.get(key)
+    if (!prior || p.distanceM > prior.distanceM) seen.set(key, p)
+  }
+  return [...seen.values()].sort((a, b) => b.distanceM - a.distanceM)
 }
