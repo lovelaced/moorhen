@@ -43,7 +43,7 @@ SPEC = {
     "mooring": ("anchor", "#33647E"),
     "winding": ("autorenew", "#33647E"),
     "stoppage": ("alert", "#C94B33"),
-    "reach": ("flag-variant", "#758FDF"),
+    "reach": ("flag-variant", "#5A6FD1"),
     "community": ("anchor", "#7B5FB8"),
 }
 

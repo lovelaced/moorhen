@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   DEFAULT_TIMING_PROFILE,
   journeyReach,
@@ -31,6 +32,9 @@ import type { RouteNotice } from '../../lib/route-notices'
 import { loadGraph } from '../../lib/route-graph'
 import { day as dayTheme, font, radius, shadow } from '../../theme'
 
+// "How far can I get?" hours — remembered between sessions, like the pace.
+const REACH_HOURS_KEY = 'moorhen.pace.reachHours'
+
 /**
  * The journey-planning home. Shares the planner store with the Map tab —
  * pick endpoints on either screen and both stay in sync; this one adds the
@@ -49,14 +53,28 @@ export default function PlanScreen() {
   const [searchTarget, setSearchTarget] = useState<'from' | 'to' | null>(null)
   const [places, setPlaces] = useState<PlaceEntry[] | null>(null)
   const [mode, setMode] = useState<'route' | 'reach'>('route')
-  const [reachHours, setReachHours] = useState(7)
+  const [reachHours, setReachHoursState] = useState(7)
   const [reach, setReach] = useState<ReachPoint[] | null>(null)
   const router = useRouter()
+
+  const setReachHours = (update: (h: number) => number) => {
+    setReachHoursState((h) => {
+      const next = update(h)
+      AsyncStorage.setItem(REACH_HOURS_KEY, String(next)).catch(() => {})
+      return next
+    })
+  }
 
   useEffect(() => {
     loadPlacesIndex()
       .then(setPlaces)
       .catch(() => setPlaces(null))
+    AsyncStorage.getItem(REACH_HOURS_KEY)
+      .then((saved) => {
+        const parsed = Number(saved)
+        if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 48) setReachHoursState(parsed)
+      })
+      .catch(() => {})
   }, [])
 
   // "how far can I get?" — recompute when the inputs move
@@ -520,7 +538,7 @@ const styles = StyleSheet.create({
   },
   fieldValue: { fontFamily: font.medium, fontSize: 14, color: dayTheme.ink, flex: 1 },
   fieldPlaceholder: { fontFamily: font.regular, fontSize: 14, color: dayTheme.ink3, flex: 1 },
-  dotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: dayTheme.accentDark },
+  dotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: dayTheme.accent },
   dotEnd: { width: 10, height: 10, borderRadius: 3, backgroundColor: dayTheme.shieldRed },
   fieldActions: { flexDirection: 'row', gap: 8 },
   actionChip: {
@@ -553,7 +571,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     height: 44,
     borderRadius: radius.control,
-    backgroundColor: dayTheme.accentDark,
+    backgroundColor: dayTheme.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -591,7 +609,7 @@ const styles = StyleSheet.create({
   warnTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
   warnTitleMuted: { color: dayTheme.ink3 },
   noticeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.accentDark, marginTop: 2 },
+  warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.accent, marginTop: 2 },
   warnBody: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2, lineHeight: 17 },
   dayRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dayDot: {
@@ -637,7 +655,7 @@ const styles = StyleSheet.create({
   },
   modePillActive: { backgroundColor: dayTheme.accent },
   modeText: { fontFamily: font.medium, fontSize: 13, color: dayTheme.ink2 },
-  modeTextActive: { color: dayTheme.ink, fontFamily: font.semibold },
+  modeTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
   reachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 },
   reachLabel: { flex: 1, fontFamily: font.medium, fontSize: 14, color: dayTheme.ink },
   emptyHint: {

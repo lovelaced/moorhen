@@ -13,10 +13,10 @@ export const day = {
   ink3: '#9C9B99',
   border: '#E5E4E1',
   borderStrong: '#D1D0CD',
-  /** The calming cornflower accent — highlights, active chips, rings. */
-  accent: '#90ACE9',
-  /** Same hue, deep enough to carry white text — buttons, links. */
-  accentDark: '#758FDF',
+  /** The calming cornflower accent — chips, buttons, rings; carries white text. */
+  accent: '#5A6FD1',
+  /** A clear step deeper — route line, icon accents, pressed states. */
+  accentDark: '#4459B5',
   /** Soft tint for pills and icon plates. */
   accentSoft: '#E7EDFB',
   water: '#5E9DB5',

@@ -109,7 +109,8 @@ class PlannerStore {
       return
     }
     const generation = ++this.planGeneration
-    this.patch({ planning: true, route: null, stops: null, routeNotices: null })
+    // a destination route supersedes any "how far can I get?" frontier
+    this.patch({ planning: true, route: null, stops: null, routeNotices: null, reach: null })
     try {
       const graph = await loadGraph()
       const route = planRoute(graph, from.point, to.point, hoursPerDay)

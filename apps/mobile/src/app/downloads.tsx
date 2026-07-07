@@ -53,7 +53,7 @@ function RegionRow({ region }: { region: RegionInfo }) {
       </View>
       {status.downloading ? (
         <View style={styles.button}>
-          <Feather name="loader" size={16} color={day.accentDark} />
+          <Feather name="loader" size={16} color={day.accent} />
           <Text style={styles.buttonText}>Downloading…</Text>
         </View>
       ) : status.downloaded ? (
@@ -63,7 +63,7 @@ function RegionRow({ region }: { region: RegionInfo }) {
         </Pressable>
       ) : (
         <Pressable style={styles.button} onPress={() => downloadRegion(region.id)}>
-          <Feather name="download" size={16} color={day.accentDark} />
+          <Feather name="download" size={16} color={day.accent} />
           <Text style={styles.buttonText}>Download</Text>
         </Pressable>
       )}

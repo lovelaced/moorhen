@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
   closedTag: { backgroundColor: '#F3DCD3' },
   closedTagText: { color: '#9C4A32' },
   linksRow: { flexDirection: 'row', gap: 16 },
-  linkText: { fontFamily: font.semibold, fontSize: 12, color: day.accentDark },
+  linkText: { fontFamily: font.semibold, fontSize: 12, color: day.accent },
   actionsRow: { flexDirection: 'row', gap: 8 },
   hoursEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   hoursInput: {
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     flex: 1,
     height: 42,
-    backgroundColor: day.accentDark,
+    backgroundColor: day.accent,
     borderRadius: radius.control,
     flexDirection: 'row',
     alignItems: 'center',

@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   filterChipActive: { backgroundColor: day.accent },
   filterLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
-  filterLabelActive: { color: day.ink, fontFamily: font.semibold },
+  filterLabelActive: { color: day.surface, fontFamily: font.semibold },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   rowIcon: {
     width: 32,
