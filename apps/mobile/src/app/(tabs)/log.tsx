@@ -55,14 +55,14 @@ export default function LogScreen() {
                 style={styles.exportButton}
                 onPress={() => exportCsv(sessions).catch(() => {})}
               >
-                <Feather name="download" size={14} color={day.greenDark} />
+                <Feather name="download" size={14} color={day.accentDark} />
                 <Text style={styles.exportText}>Export CSV</Text>
               </Pressable>
               <Pressable
                 style={styles.exportButton}
                 onPress={() => exportPdf(sessions).catch(() => {})}
               >
-                <Feather name="file-text" size={14} color={day.greenDark} />
+                <Feather name="file-text" size={14} color={day.accentDark} />
                 <Text style={styles.exportText}>Export PDF</Text>
               </Pressable>
             </View>
@@ -76,7 +76,7 @@ export default function LogScreen() {
         ) : (
           <View style={[styles.card, shadow.card]}>
             <View style={styles.iconCircle}>
-              <Feather name="book-open" size={20} color={day.greenDark} />
+              <Feather name="book-open" size={20} color={day.accentDark} />
             </View>
             <Text style={styles.cardTitle}>No cruises logged yet</Text>
             <Text style={styles.cardBody}>
@@ -101,7 +101,7 @@ function SessionRow({ session }: { session: CruiseSession }) {
   return (
     <View style={[styles.row, shadow.pill]}>
       <View style={styles.iconCircleSmall}>
-        <Feather name="navigation" size={15} color={day.greenDark} />
+        <Feather name="navigation" size={15} color={day.accentDark} />
       </View>
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>
@@ -133,9 +133,9 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
   },
-  exportText: { fontFamily: font.semibold, fontSize: 12, color: day.greenDark },
+  exportText: { fontFamily: font.semibold, fontSize: 12, color: day.accentDark },
   list: { gap: 10, paddingBottom: 20 },
   card: {
     backgroundColor: day.surface,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

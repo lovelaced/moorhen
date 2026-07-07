@@ -53,17 +53,17 @@ function RegionRow({ region }: { region: RegionInfo }) {
       </View>
       {status.downloading ? (
         <View style={styles.button}>
-          <Feather name="loader" size={16} color={day.green} />
+          <Feather name="loader" size={16} color={day.accentDark} />
           <Text style={styles.buttonText}>Downloading…</Text>
         </View>
       ) : status.downloaded ? (
         <Pressable style={styles.buttonDone} onPress={() => deleteRegion(region.id)}>
-          <Feather name="check-circle" size={16} color={day.greenDark} />
+          <Feather name="check-circle" size={16} color={day.accentDark} />
           <Text style={styles.buttonDoneText}>Saved</Text>
         </Pressable>
       ) : (
         <Pressable style={styles.button} onPress={() => downloadRegion(region.id)}>
-          <Feather name="download" size={16} color={day.green} />
+          <Feather name="download" size={16} color={day.accentDark} />
           <Text style={styles.buttonText}>Download</Text>
         </Pressable>
       )}
@@ -99,9 +99,9 @@ const styles = StyleSheet.create({
     height: 38,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
   },
-  buttonText: { fontFamily: font.semibold, fontSize: 13, color: day.greenDark },
+  buttonText: { fontFamily: font.semibold, fontSize: 13, color: day.accentDark },
   buttonDone: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -111,6 +111,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: day.surfaceMuted,
   },
-  buttonDoneText: { fontFamily: font.semibold, fontSize: 13, color: day.greenDark },
+  buttonDoneText: { fontFamily: font.semibold, fontSize: 13, color: day.accentDark },
   empty: { fontFamily: font.regular, fontSize: 13, color: day.ink2, padding: 12 },
 })

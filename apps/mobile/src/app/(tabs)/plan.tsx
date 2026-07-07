@@ -180,7 +180,7 @@ export default function PlanScreen() {
             {dedupeReach(reach, places).map((entry) => (
               <View key={entry.name} style={styles.dayRow}>
                 <View style={styles.dayDot}>
-                  <Feather name="flag" size={13} color={dayTheme.greenDark} />
+                  <Feather name="flag" size={13} color={dayTheme.accentDark} />
                 </View>
                 <View style={styles.dayCol}>
                   <Text style={styles.dayTitle}>{entry.name}</Text>
@@ -251,7 +251,7 @@ export default function PlanScreen() {
                   <Feather
                     name={routeAlerted ? 'bell-off' : 'bell'}
                     size={15}
-                    color={dayTheme.greenDark}
+                    color={dayTheme.accentDark}
                   />
                   <Text style={styles.alertButtonText} numberOfLines={2}>
                     {routeAlerted
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   },
   fieldValue: { fontFamily: font.medium, fontSize: 14, color: dayTheme.ink, flex: 1 },
   fieldPlaceholder: { fontFamily: font.regular, fontSize: 14, color: dayTheme.ink3, flex: 1 },
-  dotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: dayTheme.green },
+  dotStart: { width: 10, height: 10, borderRadius: 5, backgroundColor: dayTheme.accentDark },
   dotEnd: { width: 10, height: 10, borderRadius: 3, backgroundColor: dayTheme.shieldRed },
   fieldActions: { flexDirection: 'row', gap: 8 },
   actionChip: {
@@ -538,13 +538,13 @@ const styles = StyleSheet.create({
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   bigTime: { fontFamily: font.bold, fontSize: 30, color: dayTheme.ink, letterSpacing: -1 },
   pacePill: {
-    backgroundColor: dayTheme.greenSoft,
+    backgroundColor: dayTheme.accentSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     height: 28,
     justifyContent: 'center',
   },
-  pacePillText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.greenDark },
+  pacePillText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.accentDark },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   stat: { alignItems: 'center', gap: 3, minWidth: 64 },
   statValue: { fontFamily: font.semibold, fontSize: 15, color: dayTheme.ink },
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     height: 44,
     borderRadius: radius.control,
-    backgroundColor: dayTheme.green,
+    backgroundColor: dayTheme.accentDark,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -568,12 +568,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: radius.control,
-    backgroundColor: dayTheme.greenSoft,
+    backgroundColor: dayTheme.accentSoft,
   },
   alertButtonText: {
     fontFamily: font.semibold,
     fontSize: 12,
-    color: dayTheme.greenDark,
+    color: dayTheme.accentDark,
     flex: 1,
     lineHeight: 17,
   },
@@ -591,18 +591,18 @@ const styles = StyleSheet.create({
   warnTitle: { fontFamily: font.semibold, fontSize: 13, color: dayTheme.ink },
   warnTitleMuted: { color: dayTheme.ink3 },
   noticeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.green, marginTop: 2 },
+  warnLink: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.accentDark, marginTop: 2 },
   warnBody: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2, lineHeight: 17 },
   dayRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dayDot: {
     width: 28,
     height: 28,
     borderRadius: radius.pill,
-    backgroundColor: dayTheme.greenSoft,
+    backgroundColor: dayTheme.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayDotText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.greenDark },
+  dayDotText: { fontFamily: font.semibold, fontSize: 12, color: dayTheme.accentDark },
   dayCol: { flex: 1, gap: 2 },
   dayTitle: { fontFamily: font.semibold, fontSize: 14, color: dayTheme.ink },
   dayMeta: { fontFamily: font.regular, fontSize: 12, color: dayTheme.ink2 },
@@ -635,9 +635,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modePillActive: { backgroundColor: dayTheme.green },
+  modePillActive: { backgroundColor: dayTheme.accent },
   modeText: { fontFamily: font.medium, fontSize: 13, color: dayTheme.ink2 },
-  modeTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
+  modeTextActive: { color: dayTheme.ink, fontFamily: font.semibold },
   reachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 },
   reachLabel: { flex: 1, fontFamily: font.medium, fontSize: 14, color: dayTheme.ink },
   emptyHint: {

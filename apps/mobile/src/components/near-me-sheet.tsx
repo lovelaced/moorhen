@@ -240,7 +240,7 @@ export function NearMeSheet({
             ) : (
               <Pressable style={styles.row} onPress={() => onSelect(item)}>
                 <View style={styles.rowIcon}>
-                  <MaterialCommunityIcons name={item.icon} size={16} color={day.greenDark} />
+                  <MaterialCommunityIcons name={item.icon} size={16} color={day.accentDark} />
                 </View>
                 <View style={styles.rowText}>
                   <Text style={styles.rowName} numberOfLines={1}>
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

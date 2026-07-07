@@ -32,7 +32,7 @@ export default function MoreScreen() {
         <Link href="/downloads" asChild>
           <Pressable style={StyleSheet.flatten([styles.linkRow, shadow.card])}>
             <View style={styles.linkIcon}>
-              <Feather name="download" size={18} color={day.greenDark} />
+              <Feather name="download" size={18} color={day.accentDark} />
             </View>
             <View style={styles.linkText}>
               <Text style={styles.linkTitle}>Offline maps</Text>
@@ -85,7 +85,7 @@ function AlertsCard() {
       </Text>
       {subscriptions.map((name) => (
         <View key={name} style={styles.alertRow}>
-          <Feather name="bell" size={14} color={day.greenDark} />
+          <Feather name="bell" size={14} color={day.accentDark} />
           <Text style={styles.alertName}>{name}</Text>
           <Pressable hitSlop={8} onPress={() => void unsubscribeWaterway(name)}>
             <Feather name="x" size={16} color={day.ink3} />
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,6 +1,6 @@
 /**
  * Moorhen design tokens — the code twin of designs/README.md.
- * Day theme: warm cream, floating white cards, natural green.
+ * Day theme: warm cream, floating white cards, calming cornflower blue.
  * Night theme: cruise mode — dark map, high contrast, red only for alerts.
  */
 
@@ -13,9 +13,12 @@ export const day = {
   ink3: '#9C9B99',
   border: '#E5E4E1',
   borderStrong: '#D1D0CD',
-  green: '#3D8A5A',
-  greenDark: '#2E6B45',
-  greenSoft: '#C8F0D8',
+  /** The calming cornflower accent — highlights, active chips, rings. */
+  accent: '#90ACE9',
+  /** Same hue, deep enough to carry white text — buttons, links. */
+  accentDark: '#758FDF',
+  /** Soft tint for pills and icon plates. */
+  accentSoft: '#E7EDFB',
   water: '#5E9DB5',
   waterDeep: '#3F7E96',
   land: '#EFEDE6',
@@ -34,7 +37,7 @@ export const night = {
   ink: '#F0EFEC',
   ink2: '#9FA8A5',
   water: '#4E8CA6',
-  trail: '#7FD4A8',
+  trail: '#A8BFF0',
   alert: '#F58D77',
   shieldRed: '#D9482F',
 } as const

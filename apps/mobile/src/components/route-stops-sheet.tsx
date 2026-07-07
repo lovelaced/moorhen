@@ -117,7 +117,7 @@ export function RouteStopsSheet({
                 <MaterialCommunityIcons
                   name={ICONS[item.icon] ?? 'map-marker'}
                   size={16}
-                  color={day.greenDark}
+                  color={day.accentDark}
                 />
               </View>
               <View style={styles.rowText}>
@@ -172,15 +172,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: day.surfaceMuted,
   },
-  filterChipActive: { backgroundColor: day.green },
+  filterChipActive: { backgroundColor: day.accent },
   filterLabel: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
-  filterLabelActive: { color: day.surface, fontFamily: font.semibold },
+  filterLabelActive: { color: day.ink, fontFamily: font.semibold },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   rowIcon: {
     width: 32,
     height: 32,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

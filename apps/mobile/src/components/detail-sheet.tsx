@@ -246,7 +246,7 @@ function CommunityStatus({ facilityId, coords }: { facilityId: string; coords: [
       ) : (
         <View style={styles.communityRow}>
           <Pressable style={styles.communityButton} onPress={() => report('working')}>
-            <Feather name="check" size={14} color={day.greenDark} />
+            <Feather name="check" size={14} color={day.accentDark} />
             <Text style={styles.communityButtonText}>Working</Text>
           </Pressable>
           <Pressable style={styles.communityButton} onPress={() => report('broken')}>
@@ -296,7 +296,7 @@ function HygieneRow({ lookup }: { lookup: { name: string; point: [number, number
   const numeric = Number(rating.rating)
   return (
     <View style={styles.hygieneRow}>
-      <Feather name="check-circle" size={13} color={day.greenDark} />
+      <Feather name="check-circle" size={13} color={day.accentDark} />
       <Text style={styles.hygieneText}>
         Food hygiene:{' '}
         {Number.isFinite(numeric) ? `${'★'.repeat(numeric)} ${rating.rating}/5` : rating.rating}
@@ -361,13 +361,13 @@ function SuggestHoursBlock({
             autoFocus
           />
           <Pressable style={styles.communityButton} onPress={submit}>
-            <Feather name="check" size={14} color={day.greenDark} />
+            <Feather name="check" size={14} color={day.accentDark} />
             <Text style={styles.communityButtonText}>Send</Text>
           </Pressable>
         </View>
       ) : (
         <Pressable style={styles.communityButton} onPress={() => setEditing(true)}>
-          <Feather name="clock" size={14} color={day.greenDark} />
+          <Feather name="clock" size={14} color={day.accentDark} />
           <Text style={styles.communityButtonText}>Suggest opening hours</Text>
         </Pressable>
       )}
@@ -427,7 +427,7 @@ export function DetailSheet({
               <Feather
                 name={action.destructive ? 'trash-2' : 'refresh-cw'}
                 size={14}
-                color={action.destructive ? day.shieldRed : day.greenDark}
+                color={action.destructive ? day.shieldRed : day.accentDark}
               />
               <Text
                 style={[styles.communityButtonText, action.destructive && { color: day.shieldRed }]}
@@ -491,17 +491,17 @@ export function DetailSheet({
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   openTag: {
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     borderRadius: radius.pill,
     paddingHorizontal: 8,
     height: 20,
     justifyContent: 'center',
   },
-  openTagText: { fontFamily: font.semibold, fontSize: 11, color: day.greenDark },
+  openTagText: { fontFamily: font.semibold, fontSize: 11, color: day.accentDark },
   closedTag: { backgroundColor: '#F3DCD3' },
   closedTagText: { color: '#9C4A32' },
   linksRow: { flexDirection: 'row', gap: 16 },
-  linkText: { fontFamily: font.semibold, fontSize: 12, color: day.green },
+  linkText: { fontFamily: font.semibold, fontSize: 12, color: day.accentDark },
   actionsRow: { flexDirection: 'row', gap: 8 },
   hoursEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   hoursInput: {
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   hygieneText: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
   community: { gap: 6, marginTop: 2 },
   communityLatest: { fontFamily: font.medium, fontSize: 12, color: day.ink2 },
-  communityThanks: { fontFamily: font.medium, fontSize: 12, color: day.greenDark },
+  communityThanks: { fontFamily: font.medium, fontSize: 12, color: day.accentDark },
   communityRow: { flexDirection: 'row', gap: 8 },
   communityButton: {
     flexDirection: 'row',
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     flex: 1,
     height: 42,
-    backgroundColor: day.green,
+    backgroundColor: day.accentDark,
     borderRadius: radius.control,
     flexDirection: 'row',
     alignItems: 'center',

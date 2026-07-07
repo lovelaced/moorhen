@@ -847,8 +847,8 @@ export default function MapScreen() {
                 id="selected-ring"
                 paint={{
                   'circle-radius': 13,
-                  'circle-color': 'rgba(61, 138, 90, 0.15)',
-                  'circle-stroke-color': day.green,
+                  'circle-color': 'rgba(144, 172, 233, 0.22)',
+                  'circle-stroke-color': day.accent,
                   'circle-stroke-width': 2.5,
                 }}
               />
@@ -930,7 +930,7 @@ export default function MapScreen() {
                 id="route-line"
                 filter={['==', ['get', 'part'], 'line']}
                 paint={{
-                  'line-color': day.greenDark,
+                  'line-color': day.accentDark,
                   'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 14, 8],
                   'line-opacity': 0.9,
                 }}
@@ -941,7 +941,7 @@ export default function MapScreen() {
                 id="route-points"
                 filter={['==', ['get', 'part'], 'start']}
                 paint={{
-                  'circle-color': day.greenDark,
+                  'circle-color': day.accentDark,
                   'circle-radius': 8,
                   'circle-stroke-color': '#FFFFFF',
                   'circle-stroke-width': 2.5,
@@ -1026,7 +1026,7 @@ export default function MapScreen() {
                 <MaterialCommunityIcons
                   name={chip.key === 'canalside' ? 'filter-variant' : chip.icon}
                   size={15}
-                  color={isActive ? day.surface : day.ink2}
+                  color={isActive ? day.ink : day.ink2}
                 />
                 <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
                   {chip.label}
@@ -1063,7 +1063,7 @@ export default function MapScreen() {
                     })
                   }}
                 >
-                  <Feather name="crosshair" size={16} color={day.green} />
+                  <Feather name="crosshair" size={16} color={day.accentDark} />
                 </Pressable>
               </Pressable>
               <Pressable
@@ -1328,7 +1328,7 @@ const styles = StyleSheet.create({
   routeText: { flex: 1, gap: 2 },
   routeTitle: { fontFamily: font.semibold, fontSize: 16, color: day.ink, letterSpacing: -0.2 },
   routeMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
-  routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.green, marginTop: 2 },
+  routeStopsLink: { fontFamily: font.semibold, fontSize: 12, color: day.accentDark, marginTop: 2 },
   routeWarn: { fontFamily: font.semibold, fontSize: 12, color: '#B98A16', marginTop: 2 },
   routeBoatWarn: { fontFamily: font.semibold, fontSize: 12, color: '#9C4A32', marginTop: 2 },
   paceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
@@ -1364,7 +1364,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: day.green,
+    backgroundColor: day.accentDark,
   },
   plannerDotEnd: {
     width: 10,
@@ -1386,7 +1386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  routeButtonActive: { backgroundColor: day.green },
+  routeButtonActive: { backgroundColor: day.accentDark },
   captureButton: {
     position: 'absolute',
     right: 12,
@@ -1394,7 +1394,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.pill,
-    backgroundColor: day.green,
+    backgroundColor: day.accentDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1407,9 +1407,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 6,
   },
-  chipActive: { backgroundColor: day.green },
+  chipActive: { backgroundColor: day.accent },
   chipMeta: { borderWidth: 1.5, borderColor: day.ink3, backgroundColor: day.bg },
   chipMetaActive: { backgroundColor: day.ink, borderColor: day.ink },
   chipLabel: { fontFamily: font.medium, fontSize: 13, color: day.ink2 },
-  chipLabelActive: { fontFamily: font.semibold, color: day.surface },
+  chipLabelActive: { fontFamily: font.semibold, color: day.ink },
 })

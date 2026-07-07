@@ -95,7 +95,7 @@ export function SearchModal({
                 <MaterialCommunityIcons
                   name={KIND_ICONS[item.kind] ?? 'map-marker'}
                   size={17}
-                  color={day.greenDark}
+                  color={day.accentDark}
                 />
               </View>
               <View style={styles.rowText}>
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radius.pill,
-    backgroundColor: day.greenSoft,
+    backgroundColor: day.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

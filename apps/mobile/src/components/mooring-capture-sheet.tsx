@@ -35,7 +35,7 @@ const PALETTES = {
     border: '#E5E2DA',
     ink: day.ink,
     ink2: day.ink2,
-    accent: day.greenDark,
+    accent: day.accentDark,
   },
 } as const
 
@@ -196,7 +196,7 @@ export function MooringCaptureSheet({
             <Text style={styles.shareTitle}>Share with other boaters</Text>
             <Text style={styles.shareMeta}>Spot, edge type and signal — never your identity</Text>
           </View>
-          <Switch value={share} onValueChange={setShare} trackColor={{ true: '#2E6B45' }} />
+          <Switch value={share} onValueChange={setShare} trackColor={{ true: day.accentDark }} />
         </Pressable>
       )}
 
@@ -244,7 +244,7 @@ const makeStyles = (p: Palette) =>
       borderWidth: 1,
       borderColor: p.border,
     },
-    chipActive: { backgroundColor: '#2E6B45', borderColor: '#2E6B45' },
+    chipActive: { backgroundColor: day.accentDark, borderColor: day.accentDark },
     chipText: { fontFamily: font.medium, fontSize: 13, color: p.ink2 },
     chipTextActive: { color: '#FFFFFF', fontFamily: font.semibold },
     actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
@@ -272,7 +272,7 @@ const makeStyles = (p: Palette) =>
       marginTop: 4,
       height: 48,
       borderRadius: radius.control,
-      backgroundColor: '#2E6B45',
+      backgroundColor: day.accentDark,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
