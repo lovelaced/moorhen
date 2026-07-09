@@ -692,7 +692,6 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="mooring-badges"
-              minzoom={8}
               filter={['==', ['get', 'access'], 'public']}
               layout={{
                 visibility: active.has('moorings') ? 'visible' : 'none',
@@ -737,7 +736,6 @@ export default function MapScreen() {
               <MapLibre.Layer
                 type="symbol"
                 id="community-mooring-badges"
-                minzoom={8}
                 layout={{
                   visibility: active.has('moorings') ? 'visible' : 'none',
                   'icon-image': 'community',
@@ -757,7 +755,6 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="facility-badges"
-              minzoom={8}
               filter={
                 activeFacilityServices.length > 0
                   ? ([
@@ -778,7 +775,6 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="poi-badges"
-              minzoom={8}
               filter={
                 [
                   'all',
@@ -797,7 +793,6 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="station-badges"
-              minzoom={8}
               filter={
                 [
                   'all',
@@ -839,7 +834,6 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="tree-badges"
-              minzoom={8}
               filter={
                 [
                   'all',
@@ -1102,7 +1096,6 @@ export default function MapScreen() {
               <MapLibre.Layer
                 type="symbol"
                 id="stoppage-badges"
-                minzoom={5}
                 layout={{
                   visibility: active.has('stoppages') ? 'visible' : 'none',
                   'icon-image': 'stoppage',
