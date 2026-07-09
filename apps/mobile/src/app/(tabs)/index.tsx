@@ -25,6 +25,7 @@ import {
 } from '../../lib/moorings-store'
 import { SearchModal, type SearchEntry } from '../../components/search-modal'
 import { boatWarnings, useBoat } from '../../lib/boat-store'
+import { useSettings } from '../../lib/settings-store'
 import { loadPlacesIndex, nearestNamed, type PlaceEntry } from '../../lib/places-index'
 import { plannerStore, usePlanner } from '../../lib/planner-store'
 import type { RouteStop } from '../../lib/route-stops'
@@ -82,6 +83,7 @@ const MARKER_IMAGES = {
   shower: require('../../assets/markers/shower.png'),
   reach: require('../../assets/markers/reach.png'),
   community: require('../../assets/markers/community.png'),
+  tree: require('../../assets/markers/tree.png'),
 }
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -98,6 +100,7 @@ type ChipKey =
   | 'bins'
   | 'trains'
   | 'stoppages'
+  | 'trees'
 
 const LAYER_CHIPS: Array<{
   key: ChipKey
@@ -117,6 +120,9 @@ const LAYER_CHIPS: Array<{
   { key: 'trains', label: 'Trains', icon: 'train' },
   { key: 'stoppages', label: 'Stoppages', icon: 'alert' },
 ]
+
+/** Easter egg (7 taps on the version row): veteran & landmark trees. */
+const TREE_CHIP: (typeof LAYER_CHIPS)[number] = { key: 'trees', label: 'Old trees', icon: 'tree' }
 
 /** Which OSM POI categories each chip switches on. */
 const CHIP_POI_CATEGORIES: Partial<Record<ChipKey, string[]>> = {
@@ -141,6 +147,8 @@ const CHIP_FACILITY_SERVICES: Partial<Record<ChipKey, string[]>> = {
 const MAX_WALK_M = 1600
 /** Right on the cut — the Canalside chip swaps to this. */
 const CANALSIDE_WALK_M = 120
+/** Old trees keep a tighter circle: ~10 minutes at towpath pace. */
+const TREE_WALK_M = 800
 
 const POI_ICON: unknown = [
   'match',
@@ -225,6 +233,11 @@ export default function MapScreen() {
   } = usePlanner()
   const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
+  const { treesUnlocked } = useSettings()
+  const layerChips = useMemo(
+    () => (treesUnlocked ? [...LAYER_CHIPS, TREE_CHIP] : LAYER_CHIPS),
+    [treesUnlocked],
+  )
 
   useEffect(() => {
     fetch(urls.notices)
@@ -819,6 +832,26 @@ export default function MapScreen() {
                 'icon-allow-overlap': true,
               }}
             />
+            {/* easter egg: veteran & landmark trees within a 10-minute walk */}
+            <MapLibre.Layer
+              type="symbol"
+              id="tree-badges"
+              minzoom={9}
+              filter={
+                [
+                  'all',
+                  ['==', ['get', 'category'], 'notable-tree'],
+                  ['<=', ['get', 'walkM'], TREE_WALK_M],
+                ] as unknown as FilterSpecification
+              }
+              layout={{
+                visibility: treesUnlocked && active.has('trees') ? 'visible' : 'none',
+                'icon-image': 'tree',
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58],
+                // ancient trees are rare — every one earns its place on the map
+                'icon-allow-overlap': true,
+              }}
+            />
           </MapLibre.GeoJSONSource>
 
           <MapLibre.GeoJSONSource id="locks" data={urls.locks} onPress={onFeaturePress(selectLock)}>
@@ -1115,7 +1148,7 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
         >
-          {LAYER_CHIPS.map((chip) => {
+          {layerChips.map((chip) => {
             const isActive = active.has(chip.key)
             return (
               <Pressable

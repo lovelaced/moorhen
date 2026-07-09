@@ -45,6 +45,8 @@ SPEC = {
     "stoppage": ("alert", "#C94B33"),
     "reach": ("flag-variant", "#5A6FD1"),
     "community": ("anchor", "#7B5FB8"),
+    # easter egg
+    "tree": ("tree", "#4E7A3B"),
 }
 
 

@@ -22,6 +22,7 @@ export type PoiCategory =
   | 'chandlery'
   | 'drinking-water'
   | 'station'
+  | 'notable-tree'
 
 export interface Poi {
   id: number
@@ -38,6 +39,10 @@ export interface Poi {
   mooringM?: number
   /** Pubs only: the pub's own OSM mooring tag (yes / customer / private…). */
   mooring?: string
+  /** Notable trees only: species, English name preferred over Latin. */
+  species?: string
+  /** Notable trees only: OSM denotation (natural_monument | landmark). */
+  denotation?: string
   source: 'osm'
 }
 
@@ -67,6 +72,14 @@ function categorize(tags: Record<string, string>): PoiCategory | null {
       return 'fuel'
     default:
       break
+  }
+  // veteran/landmark trees (the easter-egg layer): denotation is the only
+  // notable-tree marker with real UK usage — TPO status never made it to OSM
+  if (
+    tags['natural'] === 'tree' &&
+    (tags['denotation'] === 'natural_monument' || tags['denotation'] === 'landmark')
+  ) {
+    return 'notable-tree'
   }
   const shop = tags['shop']
   if (shop) {
@@ -259,6 +272,18 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
     return extras
   }
 
+  const treeExtras = (
+    category: PoiCategory,
+    tags: Record<string, string>,
+  ): Pick<Poi, 'species' | 'denotation'> => {
+    if (category !== 'notable-tree') return {}
+    const extras: Pick<Poi, 'species' | 'denotation'> = {}
+    if (tags['denotation']) extras.denotation = tags['denotation']
+    const species = tags['species:en'] ?? tags['species']
+    if (species) extras.species = species
+    return extras
+  }
+
   // Canal junction guard: junction nodes must lie ON a waterway way,
   // otherwise every named road junction near the cut would leak in.
   const waterwayNodeIds = new Set<number>()
@@ -293,6 +318,7 @@ export function extractPois(data: OplData, options: ExtractPoisOptions = {}): Po
       ...waterwayOf(point),
       ...hoursOf(category, node.tags),
       ...pubExtras(category, node.tags, point),
+      ...treeExtras(category, node.tags),
       source: 'osm',
     })
   }

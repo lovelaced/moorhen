@@ -54,6 +54,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   'drinking-water': 'Drinking water',
   'lock-gate': 'Lock gate',
   station: 'Railway station',
+  'notable-tree': 'Notable tree',
+}
+
+/** The OSM denotation splits the easter-egg layer into its two kinds. */
+function treeLabel(props: Props): string {
+  return props['denotation'] === 'landmark' ? 'Landmark tree' : 'Veteran tree'
 }
 
 const FACILITY_SERVICES: Array<[string, string]> = [
@@ -115,12 +121,14 @@ const ON_WATER_CATEGORIES = new Set([
 export function selectPoi(feature: GeoJSON.Feature): SelectedFeature {
   const props = (feature.properties ?? {}) as Props
   const rawCategory = String(props['category'])
-  const category = CATEGORY_LABELS[rawCategory] ?? 'Place'
+  const category =
+    rawCategory === 'notable-tree' ? treeLabel(props) : (CATEGORY_LABELS[rawCategory] ?? 'Place')
   const rawHours = typeof props['hours'] === 'string' ? props['hours'] : null
   const hours = rawHours ? formatOpeningHours(rawHours).join('\n') : null
   const open = rawHours ? isOpenNow(rawHours) : null
   const walk = ON_WATER_CATEGORIES.has(rawCategory) ? null : walkNote(props)
-  const details = [walk, pubMooringNote(props), hours].filter(
+  const species = typeof props['species'] === 'string' ? `Species: ${props['species']}` : null
+  const details = [walk, species, pubMooringNote(props), hours].filter(
     (line): line is string => line !== null,
   )
   const coords = pointOf(feature)

@@ -1,9 +1,12 @@
 import Feather from '@expo/vector-icons/Feather'
+import Constants from 'expo-constants'
 import { Link } from 'expo-router'
+import { useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { alertsAvailable, unsubscribeWaterway, useAlertSubscriptions } from '../../lib/alerts'
 import { setBoat, useBoat } from '../../lib/boat-store'
+import { setSettings, useSettings } from '../../lib/settings-store'
 import { day, font, radius, shadow } from '../../theme'
 
 /**
@@ -69,8 +72,49 @@ export default function MoreScreen() {
             never leaves the device unless you export it.
           </Text>
         </View>
+
+        <VersionRow />
       </ScrollView>
     </SafeAreaView>
+  )
+}
+
+/** Seven taps on the version number wake the old trees (the map grows a
+ * hidden layer of veteran & landmark oaks near the cut). Android-style. */
+const UNLOCK_TAPS = 7
+
+function VersionRow() {
+  const { treesUnlocked } = useSettings()
+  const taps = useRef(0)
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [hint, setHint] = useState<string | null>(null)
+  const version = Constants.expoConfig?.version ?? '0.0.1'
+
+  const onTap = () => {
+    if (treesUnlocked) {
+      setHint('The old trees already know you 🌳')
+      return
+    }
+    taps.current += 1
+    if (resetTimer.current) clearTimeout(resetTimer.current)
+    resetTimer.current = setTimeout(() => {
+      taps.current = 0
+      setHint(null)
+    }, 2000)
+    const remaining = UNLOCK_TAPS - taps.current
+    if (remaining <= 0) {
+      setSettings({ treesUnlocked: true })
+      setHint('🌳 The veteran trees reveal themselves — look for Old trees on the map')
+    } else if (taps.current >= 3) {
+      setHint(remaining === 1 ? 'One more…' : `${remaining} taps from something ancient…`)
+    }
+  }
+
+  return (
+    <Pressable style={styles.versionRow} onPress={onTap}>
+      <Text style={styles.versionText}>Moorhen v{version}</Text>
+      {hint && <Text style={styles.versionHint}>{hint}</Text>}
+    </Pressable>
   )
 }
 
@@ -178,4 +222,12 @@ const styles = StyleSheet.create({
   linkTitle: { fontFamily: font.semibold, fontSize: 15, color: day.ink },
   linkMeta: { fontFamily: font.regular, fontSize: 12, color: day.ink2 },
   attribution: { fontFamily: font.regular, fontSize: 12, color: day.ink2, lineHeight: 18 },
+  versionRow: { alignItems: 'center', paddingVertical: 10, gap: 4 },
+  versionText: { fontFamily: font.regular, fontSize: 12, color: day.ink3 },
+  versionHint: {
+    fontFamily: font.medium,
+    fontSize: 12,
+    color: day.accentDark,
+    textAlign: 'center',
+  },
 })

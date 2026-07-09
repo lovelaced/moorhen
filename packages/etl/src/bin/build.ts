@@ -179,6 +179,8 @@ async function main(): Promise<void> {
           ...(poi.hours !== undefined ? { hours: poi.hours } : {}),
           ...(poi.mooringM !== undefined ? { mooringM: poi.mooringM } : {}),
           ...(poi.mooring !== undefined ? { mooring: poi.mooring } : {}),
+          ...(poi.species !== undefined ? { species: poi.species } : {}),
+          ...(poi.denotation !== undefined ? { denotation: poi.denotation } : {}),
           source: poi.source,
         },
       })),

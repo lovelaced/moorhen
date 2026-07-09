@@ -25,6 +25,8 @@ export const WATERWAY_FILTER_ARGS = [
   'nw/railway=station,halt',
   'nw/amenity=pub,drinking_water',
   'nw/shop=convenience,supermarket,farm,bakery,butcher,greengrocer,deli,laundry,dry_cleaning,boat',
+  // veteran/landmark trees — GB-wide this is only ~900 nodes, all trees
+  'n/denotation=natural_monument,landmark',
 ] as const
 
 /**
