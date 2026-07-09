@@ -9,3 +9,5 @@ apps/mobile/.expo/
 pnpm-lock.yaml
 packages/etl/test/fixtures/
 LICENSE
+# machine-written by the nightly ETL (drift log) — not ours to format
+data/manifest-latest.json
