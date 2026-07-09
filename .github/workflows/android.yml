@@ -1,0 +1,52 @@
+# Android APK build: Expo prebuild → Gradle → installable artifact.
+#
+# - The native android/ folder is generated (gitignored), so CI regenerates
+#   it with `expo prebuild` — the same thing `expo run:android` does locally.
+# - Expo's generated release config signs with the debug keystore, so the
+#   APK installs directly for sideloading and testing. Store signing comes
+#   later, with a real keystore.
+# - Path-filtered to what actually ships in the app: the app itself and the
+#   workspace packages it imports (graph, schema). ETL changes don't rebuild
+#   the app — the app only consumes the published artifacts.
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/graph/**'
+      - 'packages/schema/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android.yml'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate native project (expo prebuild)
+        run: pnpm --dir apps/mobile exec expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        run: cd apps/mobile/android && ./gradlew :app:assembleRelease
+
+      - name: Attach APK to run
+        uses: actions/upload-artifact@v4
+        with:
+          name: moorhen-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30

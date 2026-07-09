@@ -1,6 +1,11 @@
 node_modules/
 dist/
 coverage/
+# generated native projects & expo cache (their nested .gitignore hides them
+# from CI checkouts, but a local format:check still walks them)
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/.expo/
 pnpm-lock.yaml
 packages/etl/test/fixtures/
 LICENSE

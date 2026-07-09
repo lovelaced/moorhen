@@ -1,0 +1,62 @@
+# iOS build: Expo prebuild → CocoaPods → xcodebuild, unsigned.
+#
+# - Validates the full native compile and attaches a runnable Simulator app.
+#   No Apple Developer account is wired up yet, so there's no device signing
+#   here — that lands with real certificates later.
+# - The committed GoogleService-Info.plist is a build placeholder (no iOS
+#   app is registered in the Firebase project); push simply stays
+#   unavailable on iOS and the app's alertsAvailable() guard handles it.
+# - Same path filter as the Android build: the app and the workspace
+#   packages it imports.
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/graph/**'
+      - 'packages/schema/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ios.yml'
+
+jobs:
+  simulator-app:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate native project (expo prebuild)
+        run: pnpm --dir apps/mobile exec expo prebuild --platform ios --no-install
+
+      - name: Install pods
+        run: cd apps/mobile/ios && pod install
+
+      - name: Build (Simulator, unsigned)
+        # generic destination: compiles the simulator slice without needing
+        # a concrete simulator runtime to be installed
+        run: |
+          cd apps/mobile/ios
+          xcodebuild -workspace Moorhen.xcworkspace -scheme Moorhen \
+            -configuration Release -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+
+      - name: Zip Simulator app
+        run: |
+          cd apps/mobile/ios/build/Build/Products/Release-iphonesimulator
+          zip -ry moorhen-ios-simulator.zip Moorhen.app
+
+      - name: Attach Simulator app to run
+        uses: actions/upload-artifact@v4
+        with:
+          name: moorhen-ios-simulator
+          path: apps/mobile/ios/build/Build/Products/Release-iphonesimulator/moorhen-ios-simulator.zip
+          retention-days: 30
