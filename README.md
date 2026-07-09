@@ -1,4 +1,8 @@
-# Moorhen 🐦
+<div align="center">
+  <img src="docs/images/moorhen-sprint.svg" alt="The Moorhen mascot — a moorhen with a red frontal shield and yellow-tipped bill, sprinting" width="330">
+</div>
+
+# Moorhen
 
 **The open-source canal companion for the UK waterways** — offline-first maps, live stoppages, moorings and services, built for boaters who live on the cut.
 
@@ -7,10 +11,10 @@
 [![Android APK](https://github.com/lovelaced/moorhen/actions/workflows/android.yml/badge.svg)](https://github.com/lovelaced/moorhen/actions/workflows/android.yml)
 [![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue.svg)](LICENSE)
 
-|                                                        |                                                     |                                              |
-| ------------------------------------------------------ | --------------------------------------------------- | -------------------------------------------- |
-| ![Lock chevrons on the map](docs/images/map-locks.png) | ![Service badge layers](docs/images/map-badges.png) | ![Map home screen](docs/images/map-home.png) |
-| _Lock chevrons point uphill; winding holes ringed_     | _Water, diesel, pubs — 20 min walk max_             | _Wide vs narrow canals drawn distinctly_     |
+|                                                                                  |                                                                                                |                                                                                                    |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| ![The canal network around Braunston with layer chips](docs/images/map-home.png) | ![Braunston lock flight, chevrons pointing uphill, lock sheet open](docs/images/map-locks.png) | ![Search results for Braunston: locks, junctions, water points, shops](docs/images/map-search.png) |
+| _The network at a glance — moorings, water, winding holes_                       | _Chevrons point uphill; tap a lock for gauge and waterway_                                     | _Search the whole cut: locks, water points, village shops_                                         |
 
 Every existing canal tool covers static geography. The questions boaters actually have are _temporal_: **Is that water point working today? Is there a stoppage ahead — in my direction? Can my boat actually get into the bank here, and is there a pub, a shop, and 4G?** Moorhen answers those. Free forever, ad-free forever.
 
