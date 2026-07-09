@@ -13,6 +13,9 @@ coverage/
 # OS noise
 .DS_Store
 
+# correspondence drafts — never published with the repo
+outreach/
+
 # large geodata inputs/outputs (rebuilt by ETL; never committed)
 *.osm.pbf
 *.pmtiles

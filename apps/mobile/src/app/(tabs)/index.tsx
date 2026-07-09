@@ -692,13 +692,15 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="mooring-badges"
-              minzoom={10}
+              minzoom={8}
               filter={['==', ['get', 'access'], 'public']}
               layout={{
                 visibility: active.has('moorings') ? 'visible' : 'none',
                 'icon-image': 'mooring',
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.28, 14, 0.55],
-                'icon-allow-overlap': false,
+                // a toggled-on layer shows everything, like stations — you
+                // chose it, you get all of it
+                'icon-allow-overlap': true,
               }}
             />
           </MapLibre.GeoJSONSource>
@@ -735,7 +737,7 @@ export default function MapScreen() {
               <MapLibre.Layer
                 type="symbol"
                 id="community-mooring-badges"
-                minzoom={10}
+                minzoom={8}
                 layout={{
                   visibility: active.has('moorings') ? 'visible' : 'none',
                   'icon-image': 'community',
@@ -776,7 +778,7 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="poi-badges"
-              minzoom={9}
+              minzoom={8}
               filter={
                 [
                   'all',
@@ -787,7 +789,8 @@ export default function MapScreen() {
               layout={{
                 'icon-image': POI_ICON as string,
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58],
-                'icon-allow-overlap': false,
+                // same deal as stations: a chip you switched on hides nothing
+                'icon-allow-overlap': true,
               }}
             />
             {/* stations get their own layer: visible further out, labelled */}
@@ -836,7 +839,7 @@ export default function MapScreen() {
             <MapLibre.Layer
               type="symbol"
               id="tree-badges"
-              minzoom={9}
+              minzoom={8}
               filter={
                 [
                   'all',
