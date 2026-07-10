@@ -150,6 +150,9 @@ const CANALSIDE_WALK_M = 120
 /** Old trees keep a tighter circle: ~10 minutes at towpath pace. */
 const TREE_WALK_M = 800
 
+/** One size for every badge — toggling a chip shouldn't shrink its icons. */
+const BADGE_ICON_SIZE: unknown = ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58]
+
 const POI_ICON: unknown = [
   'match',
   ['get', 'category'],
@@ -696,7 +699,7 @@ export default function MapScreen() {
               layout={{
                 visibility: active.has('moorings') ? 'visible' : 'none',
                 'icon-image': 'mooring',
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.28, 14, 0.55],
+                'icon-size': BADGE_ICON_SIZE as number,
                 // a toggled-on layer shows everything, like stations — you
                 // chose it, you get all of it
                 'icon-allow-overlap': true,
@@ -739,7 +742,7 @@ export default function MapScreen() {
                 layout={{
                   visibility: active.has('moorings') ? 'visible' : 'none',
                   'icon-image': 'community',
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.28, 14, 0.55],
+                  'icon-size': BADGE_ICON_SIZE as number,
                   // community shares are sparse and load-bearing — always draw
                   'icon-allow-overlap': true,
                 }}
@@ -765,7 +768,7 @@ export default function MapScreen() {
               }
               layout={{
                 'icon-image': facilityIcon as unknown as string,
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.28, 14, 0.55],
+                'icon-size': BADGE_ICON_SIZE as number,
                 'icon-allow-overlap': true,
               }}
             />
@@ -784,7 +787,7 @@ export default function MapScreen() {
               }
               layout={{
                 'icon-image': POI_ICON as string,
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58],
+                'icon-size': BADGE_ICON_SIZE as number,
                 // same deal as stations: a chip you switched on hides nothing
                 'icon-allow-overlap': true,
               }}
@@ -803,7 +806,7 @@ export default function MapScreen() {
               layout={{
                 visibility: active.has('trains') ? 'visible' : 'none',
                 'icon-image': 'station',
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.32, 13, 0.55],
+                'icon-size': BADGE_ICON_SIZE as number,
                 'icon-allow-overlap': true,
                 'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
                 'text-font': ['Noto Sans Regular'],
@@ -844,7 +847,7 @@ export default function MapScreen() {
               layout={{
                 visibility: treesUnlocked && active.has('trees') ? 'visible' : 'none',
                 'icon-image': 'tree',
-                'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.3, 14, 0.58],
+                'icon-size': BADGE_ICON_SIZE as number,
                 // ancient trees are rare — every one earns its place on the map
                 'icon-allow-overlap': true,
               }}
@@ -957,7 +960,7 @@ export default function MapScreen() {
                 filter={['!=', ['get', 'hasPhoto'], true]}
                 layout={{
                   'icon-image': 'mooring',
-                  'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.2, 15, 0.4],
+                  'icon-size': BADGE_ICON_SIZE as number,
                   'icon-allow-overlap': true,
                 }}
               />
