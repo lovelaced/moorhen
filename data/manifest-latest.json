@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-07-12T06:19:11.189Z",
+  "builtAt": "2026-07-13T06:36:26.501Z",
   "input": "gb.osm.pbf",
   "offline": false,
   "edges": 4668,
@@ -14,6 +14,6 @@
   "crtFacilities": 1057,
   "crtFacilityLayers": 7,
   "conflatedPairs": 259,
-  "notices": 318,
-  "noticesNavigationBlocking": 106
+  "notices": 317,
+  "noticesNavigationBlocking": 108
 }
