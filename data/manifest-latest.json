@@ -1,19 +1,19 @@
 {
-  "builtAt": "2026-07-17T06:00:26.940Z",
+  "builtAt": "2026-07-18T05:41:35.534Z",
   "input": "gb.osm.pbf",
   "offline": false,
-  "edges": 4669,
-  "vertices": 4856,
+  "edges": 4670,
+  "vertices": 4858,
   "locks": 1966,
-  "derelictWays": 1117,
+  "derelictWays": 1118,
   "lockFeatures": 1885,
   "osmMoorings": 1921,
-  "osmPois": 51599,
+  "osmPois": 51602,
   "regions": 7,
   "overlayTiles": true,
   "crtFacilities": 1057,
   "crtFacilityLayers": 7,
   "conflatedPairs": 260,
-  "notices": 337,
-  "noticesNavigationBlocking": 119
+  "notices": 349,
+  "noticesNavigationBlocking": 125
 }
