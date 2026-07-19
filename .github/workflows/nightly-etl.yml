@@ -76,8 +76,11 @@ jobs:
         run: |
           mkdir -p data
           cp artifacts/manifest.json data/manifest-latest.json
-          git config user.name "moorhen-etl"
-          git config user.email "etl@users.noreply.github.com"
+          # The noreply address must belong to the Actions bot: GitHub links
+          # <anything>@users.noreply.github.com to the account named <anything>,
+          # so an invented name here credits a real stranger's account.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898994+github-actions[bot]@users.noreply.github.com"
           git add data/manifest-latest.json
           git diff --cached --quiet || git commit -m "chore(data): nightly manifest $(date -u +%F)"
           git push
