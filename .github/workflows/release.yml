@@ -1,0 +1,93 @@
+# Signed release APK, published as a GitHub Release.
+#
+# - Triggered by version tags (v0.0.1). The tag must match expo.version in
+#   app.json, so the installed app reports the version the release page claims.
+#   To cut a release: bump expo.version AND expo.android.versionCode (Android
+#   refuses to upgrade unless versionCode increases), commit, then
+#   `git tag v<version> && git push origin v<version>`.
+# - Signing comes from the real keystore in repo secrets, injected into the
+#   generated Gradle project by apps/mobile/plugins/withAndroidSigning.js.
+#   The build fails early if the secrets are missing rather than falling back
+#   to the debug keystore — a debug-signed "release" can't be upgraded to a
+#   properly signed one without uninstalling.
+# - workflow_dispatch runs the same signed build but only attaches the APK to
+#   the run (a dry run for the signing path, no release created).
+name: Release APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+
+      - name: Refuse to build unsigned
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_RELEASE_KEYSTORE_B64 secret is missing — not shipping a debug-signed release"
+            exit 1
+          fi
+
+      - name: Check tag matches app.json version
+        if: github.ref_type == 'tag'
+        run: |
+          APP_VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          if [ "v$APP_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME but app.json says v$APP_VERSION — bump expo.version and expo.android.versionCode, retag"
+            exit 1
+          fi
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+        run: printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moorhen-release.jks"
+
+      - name: Generate native project (expo prebuild)
+        run: pnpm --dir apps/mobile exec expo prebuild --platform android --no-install
+
+      - name: Build signed release APK
+        env:
+          MOORHEN_RELEASE_STORE_FILE: ${{ runner.temp }}/moorhen-release.jks
+          MOORHEN_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          MOORHEN_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          MOORHEN_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: cd apps/mobile/android && ./gradlew :app:assembleRelease
+
+      - name: Name the APK after the version
+        run: |
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "moorhen-v${VERSION}.apk"
+
+      - name: Attach APK to run
+        uses: actions/upload-artifact@v4
+        with:
+          name: moorhen-release-apk
+          path: moorhen-v*.apk
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" moorhen-v*.apk \
+            --title "Moorhen $GITHUB_REF_NAME" --generate-notes

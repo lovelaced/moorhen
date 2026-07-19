@@ -2,9 +2,9 @@
 #
 # - The native android/ folder is generated (gitignored), so CI regenerates
 #   it with `expo prebuild` — the same thing `expo run:android` does locally.
-# - Expo's generated release config signs with the debug keystore, so the
-#   APK installs directly for sideloading and testing. Store signing comes
-#   later, with a real keystore.
+# - This build signs with the debug keystore (the signing plugin falls back
+#   to it when the MOORHEN_RELEASE_* env vars are absent), so the APK installs
+#   directly for testing. Real releases are release.yml, triggered by v* tags.
 # - Path-filtered to what actually ships in the app: the app itself and the
 #   workspace packages it imports (graph, schema). ETL changes don't rebuild
 #   the app — the app only consumes the published artifacts.

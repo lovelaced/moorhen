@@ -24,6 +24,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.moorhen",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -39,6 +40,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withAndroidSigning",
       "expo-router",
       [
         "expo-splash-screen",
