@@ -5,7 +5,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Location from 'expo-location'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NativeSyntheticEvent } from 'react-native'
-import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Animated, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMoorings } from '../../lib/artifacts'
 import { MooringCaptureSheet, runSpeedTest } from '../../components/mooring-capture-sheet'
@@ -52,6 +52,14 @@ import { day, font, radius, shadow } from '../../theme'
  * OpenFreeMap's liberty style until our own PMTiles basemap ships.
  */
 const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+
+// Rough Great Britain bounding box. A fix outside it (holiday abroad, GPS
+// nonsense) keeps the Braunston default rather than opening on empty map.
+const inCoverage = (coords: { latitude: number; longitude: number }) =>
+  coords.longitude >= -8.7 &&
+  coords.longitude <= 1.8 &&
+  coords.latitude >= 49.8 &&
+  coords.latitude <= 60.9
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native')
 
@@ -236,7 +244,36 @@ export default function MapScreen() {
   } = usePlanner()
   const adjustPace = useCallback((delta: number) => plannerStore.adjustPace(delta), [])
   const cameraRef = useRef<import('@maplibre/maplibre-react-native').CameraRef>(null)
+  // Once the user drags the map (or taps locate), boot auto-centering stands down.
+  const userDroveCameraRef = useRef(false)
   const { treesUnlocked } = useSettings()
+
+  // Ask for location up front and open the map on the boat, not Braunston.
+  // Last known fix first so the map lands somewhere real immediately; the
+  // fresh fix nudges the camera afterwards unless the user has taken over.
+  useEffect(() => {
+    let cancelled = false
+    const centerOn = (position: Location.LocationObject, animate: boolean) => {
+      if (cancelled || userDroveCameraRef.current) return
+      if (!inCoverage(position.coords)) return
+      const center: [number, number] = [position.coords.longitude, position.coords.latitude]
+      if (animate) cameraRef.current?.easeTo({ center, zoom: 13, duration: 700 })
+      else cameraRef.current?.jumpTo({ center, zoom: 13 })
+    }
+    ;(async () => {
+      const permission = await Location.requestForegroundPermissionsAsync()
+      if (!permission.granted || cancelled) return
+      const last = await Location.getLastKnownPositionAsync()
+      if (last) centerOn(last, false)
+      const fresh = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }).catch(() => null)
+      if (fresh) centerOn(fresh, true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const layerChips = useMemo(
     () => (treesUnlocked ? [...LAYER_CHIPS, TREE_CHIP] : LAYER_CHIPS),
     [treesUnlocked],
@@ -555,13 +592,36 @@ export default function MapScreen() {
 
   const locateMe = useCallback(async () => {
     const permission = await Location.requestForegroundPermissionsAsync()
-    if (!permission.granted) return
-    const position = await Location.getCurrentPositionAsync({})
-    cameraRef.current?.easeTo({
-      center: [position.coords.longitude, position.coords.latitude],
-      zoom: 13,
-      duration: 800,
-    })
+    if (!permission.granted) {
+      // canAskAgain false means the system dialog won't show anymore — the
+      // tap would otherwise do nothing at all, forever.
+      if (!permission.canAskAgain) {
+        Alert.alert(
+          'Location is off',
+          "Moorhen can't jump to your position without location access. You can turn it on in your phone's settings.",
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open settings', onPress: () => Linking.openSettings() },
+          ],
+        )
+      }
+      return
+    }
+    userDroveCameraRef.current = true
+    const goTo = (position: Location.LocationObject) =>
+      cameraRef.current?.easeTo({
+        center: [position.coords.longitude, position.coords.latitude],
+        zoom: 13,
+        duration: 700,
+      })
+    // Last known fix first so the tap answers instantly — a cold fresh fix
+    // can take ten-plus seconds, which reads as the button doing nothing.
+    const last = await Location.getLastKnownPositionAsync()
+    if (last) goTo(last)
+    const fresh = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    }).catch(() => null)
+    if (fresh) goTo(fresh)
   }, [])
 
   const activePoiCategories = useMemo(
@@ -620,11 +680,14 @@ export default function MapScreen() {
           mapStyle={offlineStyle ?? 'https://tiles.openfreemap.org/styles/liberty'}
           onPress={onMapPress}
           onLongPress={onLongPress}
+          onRegionWillChange={(event) => {
+            if (event.nativeEvent.userInteraction) userDroveCameraRef.current = true
+          }}
           onDidFinishLoadingMap={() => setMapReady(true)}
           compass={true}
           compassPosition={{ top: 118, right: 10 }}
         >
-          {/* Braunston — the crossroads of the network — until location wiring lands */}
+          {/* Braunston — the crossroads of the network — until the first fix lands */}
           <MapLibre.Camera
             ref={cameraRef}
             initialViewState={{ center: [-1.21, 52.29], zoom: 11 }}
@@ -1193,7 +1256,12 @@ export default function MapScreen() {
                   onPress={async () => {
                     const permission = await Location.requestForegroundPermissionsAsync()
                     if (!permission.granted) return
-                    const position = await Location.getCurrentPositionAsync({})
+                    const position =
+                      (await Location.getLastKnownPositionAsync()) ??
+                      (await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                      }).catch(() => null))
+                    if (!position) return
                     plannerStore.setEndpoint('from', {
                       name: 'My location',
                       kind: 'Current position',
