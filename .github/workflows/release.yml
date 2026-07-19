@@ -65,18 +65,24 @@ jobs:
       - name: Generate native project (expo prebuild)
         run: pnpm --dir apps/mobile exec expo prebuild --platform android --no-install
 
-      - name: Build signed release APK
+      - name: Build signed release APKs (per-ABI + universal)
         env:
           MOORHEN_RELEASE_STORE_FILE: ${{ runner.temp }}/moorhen-release.jks
           MOORHEN_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
           MOORHEN_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           MOORHEN_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          MOORHEN_ABI_SPLITS: '1'
         run: cd apps/mobile/android && ./gradlew :app:assembleRelease
 
-      - name: Name the APK after the version
+      - name: Name the APKs after the version
+        # x86/x86_64 splits are built but not published — emulator users can
+        # take the universal APK.
         run: |
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "moorhen-v${VERSION}.apk"
+          OUT=apps/mobile/android/app/build/outputs/apk/release
+          for abi in arm64-v8a armeabi-v7a universal; do
+            cp "$OUT/app-${abi}-release.apk" "moorhen-v${VERSION}-${abi}.apk"
+          done
 
       - name: Attach APK to run
         uses: actions/upload-artifact@v4
@@ -88,6 +94,8 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
+        # The --notes body is prepended to the auto-generated changelog.
         run: |
           gh release create "$GITHUB_REF_NAME" moorhen-v*.apk \
-            --title "Moorhen $GITHUB_REF_NAME" --generate-notes
+            --title "Moorhen $GITHUB_REF_NAME" --generate-notes \
+            --notes "Most phones made since about 2017 want the **arm64-v8a** APK. Older 32-bit phones need **armeabi-v7a**. Not sure? The **universal** APK runs on anything, it's just a bigger download."

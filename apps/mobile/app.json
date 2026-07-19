@@ -41,6 +41,7 @@
     },
     "plugins": [
       "./plugins/withAndroidSigning",
+      "./plugins/withAbiSplits",
       "expo-router",
       [
         "expo-splash-screen",
