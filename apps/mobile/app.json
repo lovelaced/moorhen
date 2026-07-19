@@ -42,6 +42,7 @@
     "plugins": [
       "./plugins/withAndroidSigning",
       "./plugins/withAbiSplits",
+      "./plugins/withGradleJvmMemory",
       "expo-router",
       [
         "expo-splash-screen",
