@@ -1,6 +1,6 @@
 import Feather from '@expo/vector-icons/Feather'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import type { FilterSpecification } from '@maplibre/maplibre-gl-style-spec'
+import type { FilterSpecification, StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Location from 'expo-location'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -73,26 +73,36 @@ const MapLibre = loadMapLibre()
 
 /** Marker badges rendered from the icon font at build time (src/assets/markers). */
 /* eslint-disable @typescript-eslint/no-require-imports -- RN static assets */
+// Keys are namespaced: the basemap sprite also has icons called "water",
+// "shop", "fuel", "laundry", and whether the sprite or our runtime image wins
+// that name is a load-order race — it flip-flopped between builds, drawing
+// the sprite's sepia droplet where our water badge belongs. "moorhen-*" can
+// never collide.
 const MARKER_IMAGES = {
-  pub: require('../../assets/markers/pub.png'),
-  shop: require('../../assets/markers/shop.png'),
-  laundry: require('../../assets/markers/laundry.png'),
-  fuel: require('../../assets/markers/fuel.png'),
-  chandlery: require('../../assets/markers/chandlery.png'),
-  water: require('../../assets/markers/water.png'),
-  elsan: require('../../assets/markers/elsan.png'),
-  station: require('../../assets/markers/station.png'),
-  bins: require('../../assets/markers/bins.png'),
-  stoppage: require('../../assets/markers/stoppage.png'),
-  facility: require('../../assets/markers/facility.png'),
-  mooring: require('../../assets/markers/mooring.png'),
-  winding: require('../../assets/markers/winding.png'),
-  pumpout: require('../../assets/markers/pumpout.png'),
-  shower: require('../../assets/markers/shower.png'),
-  reach: require('../../assets/markers/reach.png'),
-  community: require('../../assets/markers/community.png'),
-  tree: require('../../assets/markers/tree.png'),
+  'moorhen-pub': require('../../assets/markers/pub.png'),
+  'moorhen-shop': require('../../assets/markers/shop.png'),
+  'moorhen-laundry': require('../../assets/markers/laundry.png'),
+  'moorhen-fuel': require('../../assets/markers/fuel.png'),
+  'moorhen-chandlery': require('../../assets/markers/chandlery.png'),
+  'moorhen-water': require('../../assets/markers/water.png'),
+  'moorhen-elsan': require('../../assets/markers/elsan.png'),
+  'moorhen-station': require('../../assets/markers/station.png'),
+  'moorhen-bins': require('../../assets/markers/bins.png'),
+  'moorhen-stoppage': require('../../assets/markers/stoppage.png'),
+  'moorhen-facility': require('../../assets/markers/facility.png'),
+  'moorhen-mooring': require('../../assets/markers/mooring.png'),
+  'moorhen-winding': require('../../assets/markers/winding.png'),
+  'moorhen-pumpout': require('../../assets/markers/pumpout.png'),
+  'moorhen-shower': require('../../assets/markers/shower.png'),
+  'moorhen-reach': require('../../assets/markers/reach.png'),
+  'moorhen-community': require('../../assets/markers/community.png'),
+  'moorhen-tree': require('../../assets/markers/tree.png'),
 }
+
+// Liberty minus the basemap's own POI sprites (sepia droplets, shop glyphs):
+// half badge size, not tappable — they read as broken versions of our badges.
+// Bundled by scripts/make-basemap-style.mjs, so boot skips a style fetch too.
+const HOSTED_STYLE = require('../../assets/styles/liberty-moorhen.json') as StyleSpecification
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 type ChipKey =
@@ -165,22 +175,22 @@ const POI_ICON: unknown = [
   'match',
   ['get', 'category'],
   'pub',
-  'pub',
+  'moorhen-pub',
   'shop',
-  'shop',
+  'moorhen-shop',
   'laundry',
-  'laundry',
+  'moorhen-laundry',
   'fuel',
-  'fuel',
+  'moorhen-fuel',
   'chandlery',
-  'chandlery',
+  'moorhen-chandlery',
   'water-point',
-  'water',
+  'moorhen-water',
   'drinking-water',
-  'water',
+  'moorhen-water',
   'elsan',
-  'elsan',
-  'facility',
+  'moorhen-elsan',
+  'moorhen-facility',
 ]
 
 type FeaturePress = NativeSyntheticEvent<{ features: GeoJSON.Feature[] }>
@@ -648,18 +658,18 @@ export default function MapScreen() {
       )
     }
     const order: Array<[ChipKey, string[], string]> = [
-      ['elsan', ['elsan'], 'elsan'],
-      ['pumpout', ['pumpOutUserOperated', 'pumpOutStaffOperated'], 'pumpout'],
-      ['water', ['water'], 'water'],
-      ['bins', ['refuse', 'recycling'], 'bins'],
-      ['laundry', ['washingMachine', 'tumbleDryer'], 'laundry'],
+      ['elsan', ['elsan'], 'moorhen-elsan'],
+      ['pumpout', ['pumpOutUserOperated', 'pumpOutStaffOperated'], 'moorhen-pumpout'],
+      ['water', ['water'], 'moorhen-water'],
+      ['bins', ['refuse', 'recycling'], 'moorhen-bins'],
+      ['laundry', ['washingMachine', 'tumbleDryer'], 'moorhen-laundry'],
     ]
     for (const [chip, services, icon] of order) {
       if (active.has(chip)) branch(services, icon)
     }
     for (const [, services, icon] of order) branch(services, icon)
-    branch(['shower'], 'shower')
-    clauses.push('facility')
+    branch(['shower'], 'moorhen-shower')
+    clauses.push('moorhen-facility')
     return clauses
   }, [active])
 
@@ -677,7 +687,7 @@ export default function MapScreen() {
       {MapLibre ? (
         <MapLibre.Map
           style={StyleSheet.absoluteFill}
-          mapStyle={offlineStyle ?? 'https://tiles.openfreemap.org/styles/liberty'}
+          mapStyle={offlineStyle ?? HOSTED_STYLE}
           onPress={onMapPress}
           onLongPress={onLongPress}
           onRegionWillChange={(event) => {
@@ -761,7 +771,7 @@ export default function MapScreen() {
               filter={['==', ['get', 'access'], 'public']}
               layout={{
                 visibility: active.has('moorings') ? 'visible' : 'none',
-                'icon-image': 'mooring',
+                'icon-image': 'moorhen-mooring',
                 'icon-size': BADGE_ICON_SIZE as number,
                 // a toggled-on layer shows everything, like stations — you
                 // chose it, you get all of it
@@ -804,7 +814,7 @@ export default function MapScreen() {
                 id="community-mooring-badges"
                 layout={{
                   visibility: active.has('moorings') ? 'visible' : 'none',
-                  'icon-image': 'community',
+                  'icon-image': 'moorhen-community',
                   'icon-size': BADGE_ICON_SIZE as number,
                   // community shares are sparse and load-bearing — always draw
                   'icon-allow-overlap': true,
@@ -868,7 +878,7 @@ export default function MapScreen() {
               }
               layout={{
                 visibility: active.has('trains') ? 'visible' : 'none',
-                'icon-image': 'station',
+                'icon-image': 'moorhen-station',
                 'icon-size': BADGE_ICON_SIZE as number,
                 'icon-allow-overlap': true,
                 'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
@@ -891,7 +901,7 @@ export default function MapScreen() {
               minzoom={10}
               filter={['==', ['get', 'category'], 'winding-hole']}
               layout={{
-                'icon-image': 'winding',
+                'icon-image': 'moorhen-winding',
                 'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.22, 14, 0.5],
                 'icon-allow-overlap': true,
               }}
@@ -909,7 +919,7 @@ export default function MapScreen() {
               }
               layout={{
                 visibility: treesUnlocked && active.has('trees') ? 'visible' : 'none',
-                'icon-image': 'tree',
+                'icon-image': 'moorhen-tree',
                 'icon-size': BADGE_ICON_SIZE as number,
                 // ancient trees are rare — every one earns its place on the map
                 'icon-allow-overlap': true,
@@ -1022,7 +1032,7 @@ export default function MapScreen() {
                 id="my-mooring-icon"
                 filter={['!=', ['get', 'hasPhoto'], true]}
                 layout={{
-                  'icon-image': 'mooring',
+                  'icon-image': 'moorhen-mooring',
                   'icon-size': BADGE_ICON_SIZE as number,
                   'icon-allow-overlap': true,
                 }}
@@ -1080,7 +1090,7 @@ export default function MapScreen() {
                 type="symbol"
                 id="reach-flags"
                 layout={{
-                  'icon-image': 'reach',
+                  'icon-image': 'moorhen-reach',
                   'icon-size': ['interpolate', ['linear'], ['zoom'], 6, 0.3, 12, 0.5],
                   'icon-allow-overlap': true,
                 }}
@@ -1164,7 +1174,7 @@ export default function MapScreen() {
                 id="stoppage-badges"
                 layout={{
                   visibility: active.has('stoppages') ? 'visible' : 'none',
-                  'icon-image': 'stoppage',
+                  'icon-image': 'moorhen-stoppage',
                   'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 12, 0.6],
                   'icon-allow-overlap': true,
                 }}
