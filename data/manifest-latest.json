@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-11-05T11:11:02.000Z",
+  "builtAt": "2026-11-06T11:11:55.656Z",
   "input": "gb.osm.pbf",
   "offline": false,
   "edges": 4696,
@@ -8,12 +8,12 @@
   "derelictWays": 1120,
   "lockFeatures": 1887,
   "osmMoorings": 1930,
-  "osmPois": 52070,
+  "osmPois": 52095,
   "regions": 7,
   "overlayTiles": true,
   "crtFacilities": 1057,
   "crtFacilityLayers": 7,
   "conflatedPairs": 258,
-  "notices": 351,
-  "noticesNavigationBlocking": 162
+  "notices": 352,
+  "noticesNavigationBlocking": 161
 }
